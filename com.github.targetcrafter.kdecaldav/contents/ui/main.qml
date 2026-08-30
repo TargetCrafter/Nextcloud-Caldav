@@ -155,7 +155,9 @@ PlasmoidItem {
         calendars.forEach(function (cal) {
             if (cal.kinds.indexOf("VEVENT") !== -1) {
                 pending++;
+                console.log("CalDAV Agenda: requesting events for", cal.name, "at", CalDAV.resolveHref(serverUrl, cal.href));
                 CalDAV.fetchEvents(serverUrl, username, password, cal.href, rangeStart, rangeEnd, function (err, items) {
+                    console.log("CalDAV Agenda: events response for", cal.name, "- error:", err, "count:", items ? items.length : 0);
                     try {
                         if (err) {
                             console.warn("CalDAV Agenda: fetching events for", cal.name, "failed:", err);
@@ -184,7 +186,9 @@ PlasmoidItem {
             }
             if (plasmoid.configuration.showTasks && cal.kinds.indexOf("VTODO") !== -1) {
                 pending++;
+                console.log("CalDAV Agenda: requesting tasks for", cal.name, "at", CalDAV.resolveHref(serverUrl, cal.href));
                 CalDAV.fetchTodos(serverUrl, username, password, cal.href, function (err, items) {
+                    console.log("CalDAV Agenda: tasks response for", cal.name, "- error:", err, "count:", items ? items.length : 0);
                     try {
                         if (err) {
                             console.warn("CalDAV Agenda: fetching tasks for", cal.name, "failed:", err);
