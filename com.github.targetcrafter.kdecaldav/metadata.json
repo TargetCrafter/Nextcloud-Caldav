@@ -9,23 +9,16 @@
         ],
         "Category": "Date and Time",
         "Description": "Shows upcoming Nextcloud CalDAV events and tasks on your desktop with a clean, modern interface.",
-        "Description[x-test]": "xxShows upcoming Nextcloud CalDAV events and tasks on your desktop with a clean, modern interface.xx",
         "EnabledByDefault": true,
+        "FormFactors": [
+            "desktop"
+        ],
         "Icon": "view-calendar",
         "Id": "com.github.targetcrafter.kdecaldav",
         "License": "GPL-3.0-or-later",
         "Name": "CalDAV Agenda",
-        "Name[x-test]": "xxCalDAV Agendaxx",
-        "ServiceTypes": [
-            "Plasma/Applet"
-        ],
-        "Version": "0.2.0",
+        "Version": "0.2.1",
         "Website": "https://github.com/TargetCrafter/KDE-Caldav"
     },
-    "X-Plasma-API": "declarativeappletscript",
-    "X-Plasma-MainScript": "ui/main.qml",
-    "X-Plasma-NotificationArea": true,
-    "X-Plasma-Provides": [
-        "org.kde.plasma.calendar"
-    ]
+    "X-Plasma-API-Minimum-Version": "6.0"
 }
