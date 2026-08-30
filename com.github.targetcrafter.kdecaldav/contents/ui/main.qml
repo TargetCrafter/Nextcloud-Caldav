@@ -59,6 +59,23 @@ PlasmoidItem {
         onTriggered: root.refresh()
     }
 
+    // Belt-and-braces: if a refresh hasn't finished within 30s (a request
+    // that never reaches XMLHttpRequest.DONE, rather than one that errors
+    // out normally), stop the spinner and surface it as a network problem
+    // instead of leaving the popup stuck loading forever.
+    Timer {
+        id: loadWatchdog
+        interval: 30000
+        repeat: false
+        onTriggered: {
+            if (root.isLoading) {
+                console.warn("CalDAV Agenda: refresh timed out after", interval / 1000, "s");
+                root.isLoading = false;
+                root.lastError = "timeout";
+            }
+        }
+    }
+
     Connections {
         target: plasmoid.configuration
         function onServerUrlChanged() { root.refresh() }
@@ -106,6 +123,7 @@ PlasmoidItem {
 
         isLoading = true;
         lastError = "";
+        loadWatchdog.restart();
 
         var serverUrl = plasmoid.configuration.serverUrl;
         var username = plasmoid.configuration.username;
@@ -123,17 +141,27 @@ PlasmoidItem {
         function checkDone() {
             pending--;
             if (pending <= 0) {
+                loadWatchdog.stop();
                 finishRefresh(collectedEvents, collectedTodos, firstError);
             }
         }
 
+        // Every fetch callback runs its body inside try/finally so that
+        // whatever goes wrong - a malformed server response, a bug in the
+        // parser, anything - checkDone() still fires. Without this a single
+        // unexpected exception thrown inside an XHR callback is swallowed by
+        // the QML engine and leaves the refresh (and its spinner) hung
+        // forever, since pending would never reach zero.
         calendars.forEach(function (cal) {
             if (cal.kinds.indexOf("VEVENT") !== -1) {
                 pending++;
                 CalDAV.fetchEvents(serverUrl, username, password, cal.href, rangeStart, rangeEnd, function (err, items) {
-                    if (err) {
-                        firstError = firstError || err;
-                    } else {
+                    try {
+                        if (err) {
+                            console.warn("CalDAV Agenda: fetching events for", cal.name, "failed:", err);
+                            firstError = firstError || err;
+                            return;
+                        }
                         items.forEach(function (it) {
                             try {
                                 var parsed = ICAL.parseCalendarObject(it.icsText, it.href, it.etag, rangeStart, rangeEnd);
@@ -142,18 +170,27 @@ PlasmoidItem {
                                     e.calendarName = cal.name;
                                     collectedEvents.push(e);
                                 });
-                            } catch (parseErr) { /* skip malformed entry */ }
+                            } catch (parseErr) {
+                                console.warn("CalDAV Agenda: skipping malformed event in", cal.name, ":", parseErr);
+                            }
                         });
+                    } catch (fatalErr) {
+                        console.warn("CalDAV Agenda: unexpected error handling events for", cal.name, ":", fatalErr);
+                        firstError = firstError || "parse";
+                    } finally {
+                        checkDone();
                     }
-                    checkDone();
                 });
             }
             if (plasmoid.configuration.showTasks && cal.kinds.indexOf("VTODO") !== -1) {
                 pending++;
                 CalDAV.fetchTodos(serverUrl, username, password, cal.href, function (err, items) {
-                    if (err) {
-                        firstError = firstError || err;
-                    } else {
+                    try {
+                        if (err) {
+                            console.warn("CalDAV Agenda: fetching tasks for", cal.name, "failed:", err);
+                            firstError = firstError || err;
+                            return;
+                        }
                         items.forEach(function (it) {
                             try {
                                 var parsed = ICAL.parseCalendarObject(it.icsText, it.href, it.etag, rangeStart, rangeEnd);
@@ -163,10 +200,16 @@ PlasmoidItem {
                                     t.calendarHref = cal.href;
                                     collectedTodos.push(t);
                                 });
-                            } catch (parseErr) { /* skip malformed entry */ }
+                            } catch (parseErr) {
+                                console.warn("CalDAV Agenda: skipping malformed task in", cal.name, ":", parseErr);
+                            }
                         });
+                    } catch (fatalErr) {
+                        console.warn("CalDAV Agenda: unexpected error handling tasks for", cal.name, ":", fatalErr);
+                        firstError = firstError || "parse";
+                    } finally {
+                        checkDone();
                     }
-                    checkDone();
                 });
             }
         });
@@ -268,6 +311,7 @@ PlasmoidItem {
         case "network": return i18n("Can't reach server");
         case "notfound": return i18n("Server address not found");
         case "parse": return i18n("Couldn't read calendar data");
+        case "timeout": return i18n("Timed out waiting for the server");
         default: return i18n("Something went wrong");
         }
     }

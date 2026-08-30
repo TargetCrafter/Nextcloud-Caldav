@@ -158,6 +158,7 @@ Item {
         case "network": return i18n("Can't reach the server");
         case "notfound": return i18n("Server address not found");
         case "parse": return i18n("Couldn't read calendar data");
+        case "timeout": return i18n("Timed out waiting for the server");
         case "": return i18n("Nothing coming up");
         default: return i18n("Something went wrong");
         }
@@ -171,6 +172,7 @@ Item {
         case "network": return i18n("Check the server address and your network connection.");
         case "notfound": return i18n("Double-check the Nextcloud server address in the widget settings.");
         case "parse": return i18n("The server returned data this widget doesn't understand.");
+        case "timeout": return i18n("The server took too long to respond. Try refreshing again.");
         case "": return i18n("No events or tasks in the selected time range.");
         default: return "";
         }
