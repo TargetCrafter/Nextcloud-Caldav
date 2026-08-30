@@ -283,7 +283,15 @@ Kirigami.FormLayout {
         var names = plasmoid.configuration.calendarNames.slice();
         var colors = plasmoid.configuration.calendarColors.slice();
         var kinds = plasmoid.configuration.calendarKinds.slice();
-        var kindsStr = cal.kinds.join(",");
+        // "+" rather than "," on purpose: calendarKinds is itself a
+        // KConfigXT StringList, whose own on-disk serialization already
+        // uses "," as the separator *between* list entries, so joining a
+        // per-calendar kind set with "," here would collide with that and
+        // corrupt the parallel calendarUrls/calendarNames/.../calendarKinds
+        // arrays' index alignment for any calendar supporting more than
+        // one component type (i.e. most normal calendars, which are both
+        // VEVENT and VTODO capable).
+        var kindsStr = cal.kinds.join("+");
         var idx = urls.indexOf(cal.href);
         if (idx === -1) {
             urls.push(cal.href);
@@ -318,7 +326,7 @@ Kirigami.FormLayout {
         var kinds = plasmoid.configuration.calendarKinds;
         var out = [];
         for (var i = 0; i < urls.length; i++) {
-            out.push({ href: urls[i], displayName: names[i], color: colors[i], kinds: (kinds[i] || "VEVENT").split(",") });
+            out.push({ href: urls[i], displayName: names[i], color: colors[i], kinds: (kinds[i] || "VEVENT").split("+") });
         }
         discovered = out;
         showManualFields = usernameField.text.length > 0;

@@ -102,7 +102,7 @@ PlasmoidItem {
                 href: urls[i],
                 name: names[i] || urls[i],
                 color: colors[i] || "#3daee9",
-                kinds: (kinds[i] || "VEVENT").split(",")
+                kinds: (kinds[i] || "VEVENT").split("+")
             });
         }
         return out;
@@ -115,6 +115,7 @@ PlasmoidItem {
             return;
         }
         var calendars = enabledCalendarList();
+        console.log("CalDAV Agenda: refresh() - enabled calendars:", JSON.stringify(calendars));
         if (calendars.length === 0) {
             lastError = "nocalendars";
             agendaItems = [];
