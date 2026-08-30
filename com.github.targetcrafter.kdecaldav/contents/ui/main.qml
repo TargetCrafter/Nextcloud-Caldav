@@ -27,8 +27,8 @@ PlasmoidItem {
 
     Plasmoid.icon: "view-calendar"
     Plasmoid.title: i18n("CalDAV Agenda")
-    Plasmoid.toolTipMainText: nextEvent ? nextEvent.summary : i18n("CalDAV Agenda")
-    Plasmoid.toolTipSubText: lastError !== "" ? errorSummary(lastError) : i18n("%1 events today, %2 tasks overdue", todayCount, overdueCount)
+    toolTipMainText: nextEvent ? nextEvent.summary : i18n("CalDAV Agenda")
+    toolTipSubText: lastError !== "" ? errorSummary(lastError) : i18n("%1 events today, %2 tasks overdue", todayCount, overdueCount)
 
     Plasmoid.status: (overdueCount > 0) ? PlasmaCore.Types.ActiveStatus : PlasmaCore.Types.PassiveStatus
 
@@ -48,7 +48,7 @@ PlasmoidItem {
         accountConfigured: root.accountConfigured
         onRefreshRequested: root.refresh()
         onToggleTask: root.toggleTaskCompletion(task)
-        onOpenConfigureRequested: plasmoid.action("configure").trigger()
+        onOpenConfigureRequested: plasmoid.internalAction("configure").trigger()
     }
 
     Timer {
