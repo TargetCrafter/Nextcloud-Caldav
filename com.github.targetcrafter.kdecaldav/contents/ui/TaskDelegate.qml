@@ -29,7 +29,7 @@ RowLayout {
         PlasmaComponents3.Label {
             Layout.fillWidth: true
             elide: Text.ElideRight
-            font.strikethrough: delegate.completed
+            font.strikeout: delegate.completed
             opacity: delegate.completed ? 0.6 : 1
             text: delegate.taskData.summary || i18n("(No title)")
         }
