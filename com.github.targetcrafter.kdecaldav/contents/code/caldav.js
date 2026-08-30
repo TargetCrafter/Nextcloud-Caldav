@@ -195,3 +195,64 @@ function putTodo(serverUrl, username, password, todoHref, etag, icsText, callbac
         callback(err);
     });
 }
+
+// --- Nextcloud Login Flow v2 --------------------------------------------
+// https://docs.nextcloud.com/server/latest/developer_manual/client_apis/LoginFlow/index.html#login-flow-v2
+//
+// This is how the config UI obtains credentials instead of asking the user
+// to type their password (or paste an app password) into the widget: the
+// user completes sign-in in their actual browser (so it works with 2FA/SSO
+// and the real account password never touches this code), and Nextcloud
+// hands back a username + app password pair. That pair is then used the
+// same way a manually-created app password would be — plain HTTP Basic
+// Auth against the CalDAV endpoint, via the functions above. This is *not*
+// generic OAuth2; Nextcloud does not require (or expect) a registered
+// client id/secret for it.
+
+// callback(error, { login, poll: { token, endpoint } }). `login` is the URL
+// to open in a browser; `poll` is what to hand to pollLoginFlow.
+function startLoginFlow(serverUrl, callback) {
+    var url = normalizeServerUrl(serverUrl) + "/index.php/login/v2";
+    var xhr = new XMLHttpRequest();
+    xhr.open("POST", url, true);
+    xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+    xhr.setRequestHeader("Accept", "application/json");
+    xhr.onreadystatechange = function () {
+        if (xhr.readyState !== XMLHttpRequest.DONE) return;
+        if (xhr.status !== 200) { callback(describeHttpError(xhr.status), null); return; }
+        try {
+            var data = JSON.parse(xhr.responseText);
+            if (!data || !data.poll || !data.login) { callback("parse", null); return; }
+            callback(null, data);
+        } catch (e) {
+            callback("parse", null);
+        }
+    };
+    xhr.onerror = function () { callback("network", null); };
+    xhr.send();
+}
+
+// Polls once. callback(error, result): error is null with a populated
+// result { server, loginName, appPassword } once the user has finished
+// signing in; error is "pending" while still waiting (poll again after a
+// delay); any other error string means give up.
+function pollLoginFlow(pollEndpoint, pollToken, callback) {
+    var xhr = new XMLHttpRequest();
+    xhr.open("POST", pollEndpoint, true);
+    xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+    xhr.setRequestHeader("Accept", "application/json");
+    xhr.onreadystatechange = function () {
+        if (xhr.readyState !== XMLHttpRequest.DONE) return;
+        if (xhr.status === 404) { callback("pending", null); return; }
+        if (xhr.status !== 200) { callback(describeHttpError(xhr.status), null); return; }
+        try {
+            var data = JSON.parse(xhr.responseText);
+            if (!data || !data.appPassword || !data.loginName) { callback("parse", null); return; }
+            callback(null, data);
+        } catch (e) {
+            callback("parse", null);
+        }
+    };
+    xhr.onerror = function () { callback("network", null); };
+    xhr.send("token=" + encodeURIComponent(pollToken));
+}

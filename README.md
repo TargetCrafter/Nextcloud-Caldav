@@ -6,10 +6,11 @@ interface: events and tasks grouped by day, overdue tasks called out
 separately, and one-click completion for to-dos.
 
 Built as a lighter-weight alternative to
-[KAgenda](https://github.com/aamaral14/KAgenda): plain HTTP Basic Auth with
-a Nextcloud *app password* instead of an OAuth2 + Python helper flow, and no
-compiled backend — it's a pure QML plasmoid you can install with
-`kpackagetool6`.
+[KAgenda](https://github.com/aamaral14/KAgenda): sign-in happens in your
+actual browser via Nextcloud's *Login Flow v2* instead of an OAuth2 client
+registration + Python helper process, and there's no compiled backend at
+all — it's a pure QML plasmoid you can install from a single `.plasmoid`
+file or with `kpackagetool6`.
 
 ## Features
 
@@ -25,18 +26,37 @@ compiled backend — it's a pure QML plasmoid you can install with
 
 ## Installing
 
+### Option A: a `.plasmoid` file (no terminal needed)
+
+Grab `com.github.targetcrafter.kdecaldav.plasmoid` from the
+[Releases](https://github.com/TargetCrafter/KDE-Caldav/releases) page (built
+automatically by CI for each tagged version), then either:
+
+- **Right-click the desktop or a panel → Add Widgets… → Get New Widgets…
+  → Install Widget From Local File…**, and pick the downloaded file, or
+- run `kpackagetool6 --type Plasma/Applet --install
+  com.github.targetcrafter.kdecaldav.plasmoid` from a terminal.
+
+To build that file yourself from a checkout instead of downloading it, run
+`./package.sh` — it produces
+`com.github.targetcrafter.kdecaldav.plasmoid` in the repo root, which you
+can then install the same way (or via `./install.sh
+com.github.targetcrafter.kdecaldav.plasmoid`).
+
+### Option B: from source
+
 ```sh
 git clone https://github.com/TargetCrafter/KDE-Caldav.git
 cd KDE-Caldav
 ./install.sh
 ```
 
-That runs `kpackagetool6 --type Plasma/Applet --install
-com.github.targetcrafter.kdecaldav`. Then add it from **right-click desktop
-or panel → Add Widgets… → search "CalDAV Agenda"**.
+Either way, add the widget from **right-click desktop or panel → Add
+Widgets… → search "CalDAV Agenda"**.
 
 To update after pulling new changes, run `./install.sh` again (it detects
-the existing install and upgrades it).
+the existing install and upgrades it either from source or from a
+`.plasmoid` file you pass as an argument).
 
 To remove it: `kpackagetool6 --type Plasma/Applet --remove com.github.targetcrafter.kdecaldav`
 
@@ -45,24 +65,43 @@ To remove it: `kpackagetool6 --type Plasma/Applet --remove com.github.targetcraf
 1. Open the widget's settings (right-click → Configure…).
 2. **Server address**: your Nextcloud URL, e.g. `https://cloud.example.com`
    (just the base URL — the widget appends `/remote.php/dav/...` itself).
-3. **Username**: your Nextcloud login name.
-4. **App password**: don't use your real account password. Generate a
-   scoped, revocable one instead: Nextcloud → Settings → Security →
-   *Devices & sessions* → **Create new app password**.
-5. Click **Find calendars** and tick which calendars/task lists to show.
+3. Click **Log in with Nextcloud…**. This opens your default browser to
+   Nextcloud's own sign-in page (so it works with 2FA, SSO, whatever your
+   instance uses) using [Login Flow
+   v2](https://docs.nextcloud.com/server/latest/developer_manual/client_apis/LoginFlow/index.html#login-flow-v2)
+   — the same mechanism the official desktop and mobile clients use. Your
+   account password is typed into Nextcloud's own page, never into the
+   widget. Once you approve the device in the browser, the widget picks up
+   a username + scoped app password automatically.
+   - No browser access, or the server doesn't support it? Use **Sign in
+     manually instead…** to enter a username and an app password you
+     generate yourself: Nextcloud → Settings → Security → *Devices &
+     sessions* → **Create new app password**.
+4. Click **Find calendars** (this runs automatically after browser sign-in)
+   and tick which calendars/task lists to show.
 
-## How it talks to CalDAV
+## How it talks to Nextcloud
 
-- Discovery: `PROPFIND` on `/remote.php/dav/calendars/<username>/`.
-- Events: `REPORT` calendar-query with a server-side `<C:expand>` range, so
-  recurring events don't need to be expanded client-side (Nextcloud's
-  sabre/dav backend supports this). A best-effort client-side RRULE
-  expander (daily/weekly/monthly/yearly, weekday sets) is included as a
-  fallback for servers that ignore `expand`.
-- Tasks: `REPORT` calendar-query for `VTODO`, filtered/grouped client-side.
-- Marking a task done: `PUT` with `If-Match` on the stored ETag, so a
-  conflicting edit made elsewhere is refused instead of silently
-  overwritten.
+- **Sign-in**: `POST /index.php/login/v2` starts the flow and returns a
+  browser URL plus a poll token; the widget opens the URL with
+  `Qt.openUrlExternally` and polls the returned endpoint every couple of
+  seconds until Nextcloud hands back `{ server, loginName, appPassword }`.
+  That app password is exactly what you'd get from *Create new app
+  password* by hand — it's not a generic OAuth2 access/refresh token, so
+  there's no client registration, redirect URI, or token refresh to manage.
+- **Everything else is plain CalDAV** over HTTP Basic Auth using that
+  username/app-password pair:
+  - Discovery: `PROPFIND` on `/remote.php/dav/calendars/<username>/`.
+  - Events: `REPORT` calendar-query with a server-side `<C:expand>` range,
+    so recurring events don't need to be expanded client-side (Nextcloud's
+    sabre/dav backend supports this). A best-effort client-side RRULE
+    expander (daily/weekly/monthly/yearly, weekday sets) is included as a
+    fallback for servers that ignore `expand`.
+  - Tasks: `REPORT` calendar-query for `VTODO`, filtered/grouped
+    client-side.
+  - Marking a task done: `PUT` with `If-Match` on the stored ETag, so a
+    conflicting edit made elsewhere is refused instead of silently
+    overwritten.
 
 ## Known limitations
 
@@ -72,11 +111,16 @@ To remove it: `kpackagetool6 --type Plasma/Applet --remove com.github.targetcraf
   timezone than your desktop will show shifted times. Nextcloud's
   server-side `expand` normally returns UTC times, which sidesteps this for
   most setups.
-- **Credential storage**: the app password is stored via KConfigXT's
-  `Password` entry type, which KDE Frameworks backs with KWallet when one
-  is available on the system; otherwise it falls back to the plasmoid's
-  regular (user-readable-only) config file. Using an app password rather
-  than your account password limits the blast radius either way.
+- **Credential storage**: the app password (whether obtained via browser
+  sign-in or entered manually) is stored via KConfigXT's `Password` entry
+  type, which KDE Frameworks backs with KWallet when one is available on
+  the system; otherwise it falls back to the plasmoid's regular
+  (user-readable-only) config file. Either way it's a scoped, individually
+  revocable app password, never your actual account password.
+- Login Flow v2 requires the widget to poll a plain HTTP(S) endpoint on
+  your Nextcloud server and to be able to launch a browser via
+  `xdg-open`/`Qt.openUrlExternally`; a purely headless/browser-less
+  desktop needs the manual app-password fallback instead.
 - Discovery assumes the standard Nextcloud CalDAV layout
   (`/remote.php/dav/calendars/<username>/…`); servers with a different
   principal/calendar-home layout aren't auto-discovered.
@@ -90,7 +134,10 @@ com.github.targetcrafter.kdecaldav/
   contents/
     ui/          QML: main.qml, Compact/FullRepresentation, delegates, config pages
     config/      main.xml (KConfigXT schema), config.qml (settings page list)
-    code/        caldav.js (HTTP/WebDAV), ical.js (iCalendar parsing/RRULE), dateutils.js
+    code/        caldav.js (HTTP/WebDAV + Login Flow v2), ical.js (parsing/RRULE), dateutils.js
+install.sh        installs/upgrades from source or a .plasmoid file
+package.sh         builds com.github.targetcrafter.kdecaldav.plasmoid
+.github/workflows/release.yml   builds and attaches the .plasmoid on a tagged push
 ```
 
 ## License

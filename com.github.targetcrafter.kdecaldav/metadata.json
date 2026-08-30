@@ -19,7 +19,7 @@
         "ServiceTypes": [
             "Plasma/Applet"
         ],
-        "Version": "0.1.0",
+        "Version": "0.2.0",
         "Website": "https://github.com/TargetCrafter/KDE-Caldav"
     },
     "X-Plasma-API": "declarativeappletscript",
