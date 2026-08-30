@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kcfg xmlns="http://www.kde.org/standards/kcfg/1.0"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.kde.org/standards/kcfg/1.0
+      http://www.kde.org/standards/kcfg/1.0/kcfg.xsd">
+  <kcfgfile arg="true"/>
+  <group name="Account">
+    <entry name="serverUrl" type="String">
+      <label>Nextcloud server URL</label>
+      <default></default>
+    </entry>
+    <entry name="username" type="String">
+      <label>Username</label>
+      <default></default>
+    </entry>
+    <entry name="appPassword" type="Password">
+      <label>App password</label>
+      <default></default>
+    </entry>
+  </group>
+  <group name="Calendars">
+    <!-- Parallel string lists describing every discovered calendar/task-list collection. -->
+    <entry name="calendarUrls" type="StringList">
+      <default></default>
+    </entry>
+    <entry name="calendarNames" type="StringList">
+      <default></default>
+    </entry>
+    <entry name="calendarColors" type="StringList">
+      <default></default>
+    </entry>
+    <!-- "VEVENT" or "VTODO", one entry per calendarUrls entry -->
+    <entry name="calendarKinds" type="StringList">
+      <default></default>
+    </entry>
+    <entry name="enabledCalendarUrls" type="StringList">
+      <default></default>
+    </entry>
+  </group>
+  <group name="General">
+    <entry name="daysAhead" type="Int">
+      <label>How many days of upcoming events to show</label>
+      <default>14</default>
+      <min>1</min>
+      <max>90</max>
+    </entry>
+    <entry name="refreshInterval" type="Int">
+      <label>Refresh interval in minutes</label>
+      <default>15</default>
+      <min>1</min>
+      <max>240</max>
+    </entry>
+    <entry name="showTasks" type="Bool">
+      <label>Show tasks (VTODO)</label>
+      <default>true</default>
+    </entry>
+    <entry name="showCompletedTasks" type="Bool">
+      <label>Show completed tasks</label>
+      <default>false</default>
+    </entry>
+    <entry name="showOverdueTasksOnly" type="Bool">
+      <label>In compact view, count overdue tasks only</label>
+      <default>false</default>
+    </entry>
+  </group>
+  <group name="Appearance">
+    <entry name="compactMode" type="Enum">
+      <label>What the panel icon/label shows</label>
+      <choices>
+        <choice name="NextEvent"/>
+        <choice name="TodayCount"/>
+        <choice name="IconOnly"/>
+      </choices>
+      <default>NextEvent</default>
+    </entry>
+    <entry name="showEventLocation" type="Bool">
+      <default>true</default>
+    </entry>
+    <entry name="use24HourClock" type="Bool">
+      <default>true</default>
+    </entry>
+  </group>
+</kcfg>
