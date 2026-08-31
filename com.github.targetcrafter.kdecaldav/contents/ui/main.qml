@@ -87,7 +87,10 @@ PlasmoidItem {
         function onShowCompletedTasksChanged() { root.refresh() }
     }
 
-    Component.onCompleted: refresh()
+    Component.onCompleted: {
+        console.log("CalDAV Agenda: build 0.3.1 starting");
+        refresh();
+    }
 
     function enabledCalendarList() {
         var urls = plasmoid.configuration.calendarUrls;
