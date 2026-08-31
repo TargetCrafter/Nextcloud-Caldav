@@ -153,69 +153,90 @@ PlasmoidItem {
         // unexpected exception thrown inside an XHR callback is swallowed by
         // the QML engine and leaves the refresh (and its spinner) hung
         // forever, since pending would never reach zero.
-        calendars.forEach(function (cal) {
+        calendars.forEach(function (cal, index) {
+            console.log("CalDAV Agenda: processing calendar", index + 1, "of", calendars.length, "-", cal.name);
             if (cal.kinds.indexOf("VEVENT") !== -1) {
                 pending++;
-                console.log("CalDAV Agenda: requesting events for", cal.name, "at", CalDAV.resolveHref(serverUrl, cal.href));
-                CalDAV.fetchEvents(serverUrl, username, password, cal.href, rangeStart, rangeEnd, function (err, items) {
-                    console.log("CalDAV Agenda: events response for", cal.name, "- error:", err, "count:", items ? items.length : 0);
-                    try {
-                        if (err) {
-                            console.warn("CalDAV Agenda: fetching events for", cal.name, "failed:", err);
-                            firstError = firstError || err;
-                            return;
-                        }
-                        items.forEach(function (it) {
-                            try {
-                                var parsed = ICAL.parseCalendarObject(it.icsText, it.href, it.etag, rangeStart, rangeEnd);
-                                parsed.events.forEach(function (e) {
-                                    e.calendarColor = cal.color;
-                                    e.calendarName = cal.name;
-                                    collectedEvents.push(e);
-                                });
-                            } catch (parseErr) {
-                                console.warn("CalDAV Agenda: skipping malformed event in", cal.name, ":", parseErr);
+                // The request-initiation call itself is also wrapped in
+                // try/catch, not just its response callback: if it throws
+                // synchronously (before the async XHR is even registered),
+                // an uncaught exception here would both abort this whole
+                // forEach loop (skipping every calendar after this one) and
+                // leave checkDone() never called for this entry, hanging
+                // the refresh permanently. Both symptoms were observed
+                // before this was added.
+                try {
+                    console.log("CalDAV Agenda: requesting events for", cal.name, "at", CalDAV.resolveHref(serverUrl, cal.href));
+                    CalDAV.fetchEvents(serverUrl, username, password, cal.href, rangeStart, rangeEnd, function (err, items) {
+                        console.log("CalDAV Agenda: events response for", cal.name, "- error:", err, "count:", items ? items.length : 0);
+                        try {
+                            if (err) {
+                                console.warn("CalDAV Agenda: fetching events for", cal.name, "failed:", err);
+                                firstError = firstError || err;
+                                return;
                             }
-                        });
-                    } catch (fatalErr) {
-                        console.warn("CalDAV Agenda: unexpected error handling events for", cal.name, ":", fatalErr);
-                        firstError = firstError || "parse";
-                    } finally {
-                        checkDone();
-                    }
-                });
+                            items.forEach(function (it) {
+                                try {
+                                    var parsed = ICAL.parseCalendarObject(it.icsText, it.href, it.etag, rangeStart, rangeEnd);
+                                    parsed.events.forEach(function (e) {
+                                        e.calendarColor = cal.color;
+                                        e.calendarName = cal.name;
+                                        collectedEvents.push(e);
+                                    });
+                                } catch (parseErr) {
+                                    console.warn("CalDAV Agenda: skipping malformed event in", cal.name, ":", parseErr);
+                                }
+                            });
+                        } catch (fatalErr) {
+                            console.warn("CalDAV Agenda: unexpected error handling events for", cal.name, ":", fatalErr);
+                            firstError = firstError || "parse";
+                        } finally {
+                            checkDone();
+                        }
+                    });
+                } catch (initErr) {
+                    console.warn("CalDAV Agenda: failed to start events request for", cal.name, ":", initErr);
+                    firstError = firstError || "network";
+                    checkDone();
+                }
             }
             if (plasmoid.configuration.showTasks && cal.kinds.indexOf("VTODO") !== -1) {
                 pending++;
-                console.log("CalDAV Agenda: requesting tasks for", cal.name, "at", CalDAV.resolveHref(serverUrl, cal.href));
-                CalDAV.fetchTodos(serverUrl, username, password, cal.href, function (err, items) {
-                    console.log("CalDAV Agenda: tasks response for", cal.name, "- error:", err, "count:", items ? items.length : 0);
-                    try {
-                        if (err) {
-                            console.warn("CalDAV Agenda: fetching tasks for", cal.name, "failed:", err);
-                            firstError = firstError || err;
-                            return;
-                        }
-                        items.forEach(function (it) {
-                            try {
-                                var parsed = ICAL.parseCalendarObject(it.icsText, it.href, it.etag, rangeStart, rangeEnd);
-                                parsed.todos.forEach(function (t) {
-                                    t.calendarColor = cal.color;
-                                    t.calendarName = cal.name;
-                                    t.calendarHref = cal.href;
-                                    collectedTodos.push(t);
-                                });
-                            } catch (parseErr) {
-                                console.warn("CalDAV Agenda: skipping malformed task in", cal.name, ":", parseErr);
+                try {
+                    console.log("CalDAV Agenda: requesting tasks for", cal.name, "at", CalDAV.resolveHref(serverUrl, cal.href));
+                    CalDAV.fetchTodos(serverUrl, username, password, cal.href, function (err, items) {
+                        console.log("CalDAV Agenda: tasks response for", cal.name, "- error:", err, "count:", items ? items.length : 0);
+                        try {
+                            if (err) {
+                                console.warn("CalDAV Agenda: fetching tasks for", cal.name, "failed:", err);
+                                firstError = firstError || err;
+                                return;
                             }
-                        });
-                    } catch (fatalErr) {
-                        console.warn("CalDAV Agenda: unexpected error handling tasks for", cal.name, ":", fatalErr);
-                        firstError = firstError || "parse";
-                    } finally {
-                        checkDone();
-                    }
-                });
+                            items.forEach(function (it) {
+                                try {
+                                    var parsed = ICAL.parseCalendarObject(it.icsText, it.href, it.etag, rangeStart, rangeEnd);
+                                    parsed.todos.forEach(function (t) {
+                                        t.calendarColor = cal.color;
+                                        t.calendarName = cal.name;
+                                        t.calendarHref = cal.href;
+                                        collectedTodos.push(t);
+                                    });
+                                } catch (parseErr) {
+                                    console.warn("CalDAV Agenda: skipping malformed task in", cal.name, ":", parseErr);
+                                }
+                            });
+                        } catch (fatalErr) {
+                            console.warn("CalDAV Agenda: unexpected error handling tasks for", cal.name, ":", fatalErr);
+                            firstError = firstError || "parse";
+                        } finally {
+                            checkDone();
+                        }
+                    });
+                } catch (initErr) {
+                    console.warn("CalDAV Agenda: failed to start tasks request for", cal.name, ":", initErr);
+                    firstError = firstError || "network";
+                    checkDone();
+                }
             }
         });
     }
