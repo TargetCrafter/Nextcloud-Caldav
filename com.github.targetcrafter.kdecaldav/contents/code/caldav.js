@@ -1,10 +1,36 @@
 .pragma library
 
 // Thin CalDAV client for Nextcloud, built on QML's built-in XMLHttpRequest.
-// Speaks just enough WebDAV/CalDAV (RFC 4791) to discover calendar/task-list
-// collections under a user's calendar-home and run calendar-query REPORTs
-// against them. Parsing of the returned iCalendar payloads happens in
-// ical.js; this module only deals with HTTP + XML plumbing.
+//
+// IMPORTANT: Qt's QML XMLHttpRequest hardcodes an allow-list of HTTP methods
+// (see QQmlXMLHttpRequestCtor::method_open in qtdeclarative) - GET, PUT,
+// HEAD, POST, DELETE, OPTIONS, PROPFIND, PATCH - and throws a JS exception
+// for anything else. REPORT, the method RFC 4791's calendar-query and
+// calendar-multiget are built on, is *not* on that list, and there is no
+// way to work around this client-side; it's enforced in Qt's C++, not
+// something a request can talk its way past. So none of this can use a
+// standard CalDAV REPORT.
+//
+// Instead:
+//  - Events are fetched via SabreDAV's ICS export extension
+//    (GET <calendar>?export&expand=1&start=..&end=..), which returns one
+//    merged, already-expanded VCALENDAR blob for the whole range using a
+//    plain GET. This is what Nextcloud (and other SabreDAV-based servers)
+//    expose; it is not part of the base CalDAV spec, so this widget is
+//    less portable to non-SabreDAV CalDAV servers than a REPORT-based
+//    client would be.
+//  - Tasks are fetched via PROPFIND (Depth: 1, requesting getetag and
+//    getcontenttype) to list the collection's members and pick out just
+//    the ones SabreDAV's getcontenttype reports as "component=VTODO",
+//    followed by an individual GET per matching resource. This is
+//    needed (rather than also using ?export) because task completion
+//    toggling has to PUT back to a *specific* resource's href with an
+//    If-Match on its etag, and the merged export blob doesn't preserve
+//    per-object identity.
+//
+// Discovery (PROPFIND on the calendar-home) and the completion-toggle
+// write-back (PUT) both already only use allow-listed methods and are
+// unaffected by any of this.
 
 function normalizeServerUrl(url) {
     var trimmed = (url || "").trim().replace(/\/+$/, "");
@@ -64,12 +90,6 @@ function extractFirst(xml, tag) {
     return all.length > 0 ? all[0] : null;
 }
 
-function toUtcStamp(date) {
-    function pad(n) { return (n < 10 ? "0" : "") + n; }
-    return date.getUTCFullYear() + pad(date.getUTCMonth() + 1) + pad(date.getUTCDate()) + "T" +
-           pad(date.getUTCHours()) + pad(date.getUTCMinutes()) + pad(date.getUTCSeconds()) + "Z";
-}
-
 function sendRequest(method, url, username, password, headers, body, callback) {
     var xhr = new XMLHttpRequest();
     xhr.open(method, url, true);
@@ -84,7 +104,10 @@ function sendRequest(method, url, username, password, headers, body, callback) {
         }
     };
     xhr.onerror = function () { callback("network", xhr); };
-    xhr.send(body);
+    // xhr.send(x) stringifies whatever it's given - even null becomes the
+    // literal text "null" - so a bodyless request (GET, PROPFIND without a
+    // filter body, ...) must call send() with no arguments at all.
+    if (body) xhr.send(body); else xhr.send();
 }
 
 // callback(error, calendars) where calendars is an array of
@@ -129,59 +152,82 @@ function parseCalendarHome(xmlText) {
     return calendars;
 }
 
-// callback(error, items) where items is [{ href, etag, icsText }]
+// callback(error, items) where items is [{ href, etag, icsText }] - a
+// single-element array, since ?export returns one merged VCALENDAR for the
+// whole range rather than a per-resource listing. etag is null: individual
+// event resources aren't identifiable from this response, but nothing here
+// needs to write events back, only display them.
 function fetchEvents(serverUrl, username, password, calendarHref, rangeStart, rangeEnd, callback) {
     var url = resolveHref(serverUrl, calendarHref);
-    var startStamp = toUtcStamp(rangeStart);
-    var endStamp = toUtcStamp(rangeEnd);
-    var body = '<?xml version="1.0" encoding="utf-8" ?>' +
-        '<c:calendar-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">' +
-        '<d:prop><d:getetag/><c:calendar-data><c:expand start="' + startStamp + '" end="' + endStamp + '"/></c:calendar-data></d:prop>' +
-        '<c:filter><c:comp-filter name="VCALENDAR"><c:comp-filter name="VEVENT">' +
-        '<c:time-range start="' + startStamp + '" end="' + endStamp + '"/>' +
-        '</c:comp-filter></c:comp-filter></c:filter>' +
-        '</c:calendar-query>';
-    runCalendarQuery(url, username, password, body, callback);
+    var sep = url.indexOf("?") === -1 ? "?" : "&";
+    url += sep + "export&expand=1" +
+        "&start=" + Math.floor(rangeStart.getTime() / 1000) +
+        "&end=" + Math.floor(rangeEnd.getTime() / 1000);
+    sendRequest("GET", url, username, password, { "Accept": "text/calendar" }, null, function (err, xhr) {
+        if (err) { callback(err, null); return; }
+        callback(null, [{ href: calendarHref, etag: null, icsText: xhr.responseText }]);
+    });
 }
 
-// callback(error, items) where items is [{ href, etag, icsText }]. Fetches
-// every VTODO in the collection; completion/due-date filtering happens
-// client-side since CalDAV time-range semantics for VTODO are awkward.
+// callback(error, items) where items is [{ href, etag, icsText }], one per
+// task. Every VTODO in the collection is returned; completion/due-date
+// filtering happens client-side since CalDAV time-range semantics for
+// VTODO are awkward, and ?export drops start/end filtering support for
+// VTODO entirely (see the file-level comment).
+//
+// Two-step: PROPFIND (Depth: 1) lists every member of the collection with
+// its etag and getcontenttype, which SabreDAV reports as e.g.
+// "text/calendar; component=VTODO" per resource - filtering on that avoids
+// downloading every VEVENT in a mixed calendar just to discard it. Each
+// matching resource is then fetched individually with a plain GET.
 function fetchTodos(serverUrl, username, password, calendarHref, callback) {
     var url = resolveHref(serverUrl, calendarHref);
     var body = '<?xml version="1.0" encoding="utf-8" ?>' +
-        '<c:calendar-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">' +
-        '<d:prop><d:getetag/><c:calendar-data/></d:prop>' +
-        '<c:filter><c:comp-filter name="VCALENDAR"><c:comp-filter name="VTODO"/></c:comp-filter></c:filter>' +
-        '</c:calendar-query>';
-    runCalendarQuery(url, username, password, body, callback);
-}
-
-function runCalendarQuery(url, username, password, body, callback) {
-    sendRequest("REPORT", url, username, password, { "Depth": "1", "Content-Type": "application/xml; charset=utf-8" }, body,
+        '<d:propfind xmlns:d="DAV:"><d:prop><d:getetag/><d:getcontenttype/></d:prop></d:propfind>';
+    sendRequest("PROPFIND", url, username, password, { "Depth": "1", "Content-Type": "application/xml; charset=utf-8" }, body,
         function (err, xhr) {
             if (err) { callback(err, null); return; }
+            var entries;
             try {
-                callback(null, parseMultistatusCalendarData(xhr.responseText));
+                entries = parseTodoListing(xhr.responseText);
             } catch (e) {
                 callback("parse", null);
+                return;
             }
+            if (entries.length === 0) { callback(null, []); return; }
+
+            var results = [];
+            var pending = entries.length;
+            var firstErr = null;
+            entries.forEach(function (entry) {
+                var itemUrl = resolveHref(serverUrl, entry.href);
+                sendRequest("GET", itemUrl, username, password, { "Accept": "text/calendar" }, null, function (getErr, itemXhr) {
+                    if (getErr) {
+                        firstErr = firstErr || getErr;
+                    } else {
+                        results.push({ href: entry.href, etag: entry.etag, icsText: itemXhr.responseText });
+                    }
+                    pending--;
+                    if (pending <= 0) callback(results.length > 0 ? null : firstErr, results);
+                });
+            });
         });
 }
 
-function parseMultistatusCalendarData(xmlText) {
+function parseTodoListing(xmlText) {
     var xml = stripNamespacePrefixes(xmlText);
     var responses = extractAll(xml, "response");
-    var items = [];
+    var out = [];
     for (var i = 0; i < responses.length; i++) {
         var block = responses[i];
+        var contentType = extractFirst(block, "getcontenttype") || "";
+        if (contentType.toUpperCase().indexOf("VTODO") === -1) continue;
         var href = extractFirst(block, "href");
+        if (!href) continue;
         var etag = extractFirst(block, "getetag");
-        var data = extractFirst(block, "calendar-data");
-        if (!href || !data) continue;
-        items.push({ href: decodeXmlEntities(href), etag: etag ? decodeXmlEntities(etag) : null, icsText: decodeXmlEntities(data) });
+        out.push({ href: decodeXmlEntities(href), etag: etag ? decodeXmlEntities(etag) : null });
     }
-    return items;
+    return out;
 }
 
 // Writes back a full VTODO ICS body (as produced by ical.js's

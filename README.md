@@ -1,9 +1,9 @@
 # CalDAV Agenda
 
-A KDE Plasma 6 widget that shows your upcoming Nextcloud (or any CalDAV
-server's) events and tasks on the desktop or panel, with a clean Kirigami
-interface: events and tasks grouped by day, overdue tasks called out
-separately, and one-click completion for to-dos.
+A KDE Plasma 6 widget that shows your upcoming Nextcloud events and tasks
+on the desktop or panel, with a clean Kirigami interface: events and tasks
+grouped by day, overdue tasks called out separately, and one-click
+completion for to-dos.
 
 Built as a lighter-weight alternative to
 [KAgenda](https://github.com/aamaral14/KAgenda): sign-in happens in your
@@ -89,28 +89,48 @@ To remove it: `kpackagetool6 --type Plasma/Applet --remove com.github.targetcraf
   That app password is exactly what you'd get from *Create new app
   password* by hand — it's not a generic OAuth2 access/refresh token, so
   there's no client registration, redirect URI, or token refresh to manage.
-- **Everything else is plain CalDAV** over HTTP Basic Auth using that
-  username/app-password pair:
+- **Everything else is CalDAV/WebDAV** over HTTP Basic Auth using that
+  username/app-password pair — but with one hard constraint: Qt's QML
+  `XMLHttpRequest` only allows `GET, PUT, HEAD, POST, DELETE, OPTIONS,
+  PROPFIND, PATCH` and throws a JS exception for anything else, including
+  `REPORT` — the method RFC 4791's `calendar-query`/`calendar-multiget`
+  (the standard way a CalDAV client fetches events and tasks) is built on.
+  This is enforced in Qt's C++, not something a request can work around, so
+  a pure-QML plasmoid genuinely cannot issue a standards-based CalDAV
+  query. Instead:
   - Discovery: `PROPFIND` on `/remote.php/dav/calendars/<username>/`.
-  - Events: `REPORT` calendar-query with a server-side `<C:expand>` range,
-    so recurring events don't need to be expanded client-side (Nextcloud's
-    sabre/dav backend supports this). A best-effort client-side RRULE
-    expander (daily/weekly/monthly/yearly, weekday sets) is included as a
-    fallback for servers that ignore `expand`.
-  - Tasks: `REPORT` calendar-query for `VTODO`, filtered/grouped
-    client-side.
+  - Events: `GET <calendar>?export&expand=1&start=..&end=..` — SabreDAV's
+    (Nextcloud's CalDAV backend) built-in ICS-export extension, which
+    returns one already-expanded VCALENDAR blob for the date range using a
+    plain GET. This is a SabreDAV/Nextcloud extension, not part of the base
+    CalDAV spec — a non-SabreDAV CalDAV server likely won't support it,
+    which is why this widget is Nextcloud-specific rather than "any CalDAV
+    server."
+  - Tasks: `PROPFIND` (Depth: 1) lists the calendar's members with their
+    ETag and content-type, filtered client-side to the ones SabreDAV
+    reports as `component=VTODO`, then a plain `GET` per matching task.
+    Two steps rather than one `GET ?export`, because marking a task done
+    needs a specific resource's href + ETag to `PUT` back to, and the
+    merged export blob doesn't preserve that.
   - Marking a task done: `PUT` with `If-Match` on the stored ETag, so a
     conflicting edit made elsewhere is refused instead of silently
     overwritten.
+  - A best-effort client-side RRULE expander (daily/weekly/monthly/yearly,
+    weekday sets) still exists in `ical.js` as a fallback for any VEVENT
+    that reaches the parser with an un-expanded `RRULE` still attached.
 
 ## Known limitations
 
-- **Timezones**: event times carrying a `TZID` (rather than UTC) are
-  treated as wall-clock time in the desktop's local timezone. There's no
-  bundled IANA timezone database, so a calendar authored in a different
-  timezone than your desktop will show shifted times. Nextcloud's
-  server-side `expand` normally returns UTC times, which sidesteps this for
-  most setups.
+- **Nextcloud-specific**: fetching relies on SabreDAV's `?export`
+  extension (see above), not the base CalDAV `REPORT` method. It should
+  work against any SabreDAV-based server (Nextcloud, ownCloud) but not
+  against CalDAV servers that aren't SabreDAV-based.
+- **Timezones**: event times are expanded server-side and returned in UTC
+  by the `?export` endpoint, so this mostly isn't an issue for events. A
+  task (VTODO) due date carrying a `TZID` (rather than UTC) is still
+  treated as wall-clock time in the desktop's local timezone, since
+  there's no bundled IANA timezone database — a task due date authored in
+  a different timezone than your desktop may show a shifted time.
 - **Credential storage**: the app password (whether obtained via browser
   sign-in or entered manually) is stored via KConfigXT's `Password` entry
   type, which KDE Frameworks backs with KWallet when one is available on
