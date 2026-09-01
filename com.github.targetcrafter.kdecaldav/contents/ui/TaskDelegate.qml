@@ -12,7 +12,7 @@ Item {
     readonly property bool completed: taskData.status === "COMPLETED"
     readonly property int depth: taskData.depth || 0
 
-    implicitHeight: row.implicitHeight + Kirigami.Units.smallSpacing * 1.6
+    implicitHeight: row.implicitHeight + Kirigami.Units.largeSpacing
 
     HoverHandler {
         id: hover
@@ -20,20 +20,21 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        anchors.margins: 1
         radius: Kirigami.Units.cornerRadius
-        // Tasks get a faint tint (as opposed to events' plain background) so
-        // the two kinds of agenda item are distinguishable at a glance even
-        // before reading their content.
+        // Tasks get a tinted background (as opposed to events' neutral one)
+        // so the two kinds of agenda item are distinguishable at a glance
+        // even before reading their content.
         color: hover.hovered ? Kirigami.Theme.hoverColor : Kirigami.Theme.neutralBackgroundColor
-        opacity: hover.hovered ? 1 : 0.25
+        border.width: 1
+        border.color: Kirigami.Theme.neutralTextColor
+        opacity: hover.hovered ? 1 : 0.35
     }
 
     RowLayout {
         id: row
         anchors.fill: parent
-        anchors.margins: Kirigami.Units.smallSpacing
-        anchors.leftMargin: Kirigami.Units.smallSpacing + delegate.depth * Kirigami.Units.gridUnit
+        anchors.margins: Kirigami.Units.mediumSpacing
+        anchors.leftMargin: Kirigami.Units.mediumSpacing + delegate.depth * Kirigami.Units.gridUnit
         spacing: Kirigami.Units.smallSpacing
 
         PlasmaComponents3.Label {

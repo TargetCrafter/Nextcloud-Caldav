@@ -114,7 +114,7 @@ Item {
             ListView {
                 id: agendaList
                 model: fullRep.agendaItems
-                spacing: 0
+                spacing: Kirigami.Units.smallSpacing
                 boundsBehavior: Flickable.StopAtBounds
 
                 delegate: Loader {

@@ -96,7 +96,7 @@ PlasmoidItem {
     }
 
     Component.onCompleted: {
-        console.log("CalDAV Agenda: build 0.3.1 starting");
+        console.log("CalDAV Agenda: build 0.4.1 starting");
         refresh();
     }
 
@@ -316,6 +316,9 @@ PlasmoidItem {
         var eventsByDay = {};
         events.forEach(function (e) {
             if (!e.dtstart) return;
+            // Fixed at refresh time, not re-evaluated live minute-to-minute -
+            // used to fade out events that have already happened today.
+            e.isPast = (e.dtend ? e.dtend.getTime() : e.dtstart.getTime()) < now.getTime();
             var key = DateUtils.dayKey(e.dtstart);
             (eventsByDay[key] = eventsByDay[key] || []).push(e);
         });

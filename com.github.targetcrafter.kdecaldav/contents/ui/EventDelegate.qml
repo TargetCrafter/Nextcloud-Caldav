@@ -8,7 +8,14 @@ Item {
 
     required property var eventData
 
-    implicitHeight: row.implicitHeight + Kirigami.Units.smallSpacing * 1.6
+    // An event that has already ended (or, for a point-in-time event with
+    // no end, already started) earlier today is fixed at refresh time in
+    // main.qml's finishRefresh(), not re-evaluated live minute-to-minute.
+    readonly property bool isPast: eventData.isPast === true
+
+    implicitHeight: row.implicitHeight + Kirigami.Units.largeSpacing
+
+    opacity: isPast ? 0.5 : 1
 
     HoverHandler {
         id: hover
@@ -16,16 +23,17 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        anchors.margins: 1
         radius: Kirigami.Units.cornerRadius
-        color: hover.hovered ? Kirigami.Theme.hoverColor : Kirigami.Theme.backgroundColor
-        opacity: hover.hovered ? 1 : 0.4
+        color: hover.hovered ? Kirigami.Theme.hoverColor : Kirigami.Theme.alternateBackgroundColor
+        border.width: 1
+        border.color: Kirigami.Theme.textColor
+        opacity: hover.hovered ? 1 : 0.35
     }
 
     RowLayout {
         id: row
         anchors.fill: parent
-        anchors.margins: Kirigami.Units.smallSpacing
+        anchors.margins: Kirigami.Units.mediumSpacing
         spacing: Kirigami.Units.smallSpacing
 
         Rectangle {
