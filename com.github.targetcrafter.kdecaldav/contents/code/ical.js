@@ -51,6 +51,25 @@ function unescapeText(value) {
         .replace(/\\\\/g, "\\");
 }
 
+// Inverse of unescapeText, for embedding user-entered text in a new ICS
+// property value. Order matters: backslashes first, so escaping the other
+// characters doesn't get re-escaped.
+function escapeText(value) {
+    return String(value)
+        .replace(/\\/g, "\\\\")
+        .replace(/\n/g, "\\n")
+        .replace(/,/g, "\\,")
+        .replace(/;/g, "\\;");
+}
+
+function generateUid() {
+    var chars = "0123456789abcdef";
+    var s = "";
+    for (var i = 0; i < 32; i++) s += chars[Math.floor(Math.random() * 16)];
+    return s.substring(0, 8) + "-" + s.substring(8, 12) + "-" + s.substring(12, 16) +
+           "-" + s.substring(16, 20) + "-" + s.substring(20, 32) + "@kdecaldav";
+}
+
 function pad(n) { return (n < 10 ? "0" : "") + n; }
 
 // Parses a DATE or DATE-TIME property value into { date: Date, allDay: bool }.
@@ -159,6 +178,20 @@ function buildTodo(map, href, etag) {
     var completed = completedProp ? parseDateTime(completedProp).date : null;
     var percentProp = first(map, "PERCENT-COMPLETE");
     var priorityProp = first(map, "PRIORITY");
+    // A bare RELATED-TO (or explicit RELTYPE=PARENT) names this task's
+    // parent's UID - that's how Nextcloud Tasks (and this app's own
+    // subtask creation) represents subtasks. RELTYPE=CHILD/SIBLING point
+    // the other direction and aren't a "this task's parent" relationship,
+    // so they're deliberately not treated as one here.
+    var relatedTo = null;
+    var relatedProps = map["RELATED-TO"] || [];
+    for (var r = 0; r < relatedProps.length; r++) {
+        var reltype = relatedProps[r].params.RELTYPE;
+        if (!reltype || reltype.toUpperCase() === "PARENT") {
+            relatedTo = relatedProps[r].value;
+            break;
+        }
+    }
     return {
         kind: "VTODO",
         uid: textValue(map, "UID"),
@@ -171,6 +204,7 @@ function buildTodo(map, href, etag) {
         completed: completed,
         percentComplete: percentProp ? parseInt(percentProp.value, 10) : 0,
         priority: priorityProp ? parseInt(priorityProp.value, 10) : 0,
+        parentUid: relatedTo,
         href: href,
         etag: etag,
         rawLines: null // filled in by caller for PUT round-trips
@@ -368,4 +402,62 @@ function patchTodoStatus(todo, completed) {
     }
     return "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//KDE-Caldav//CalDAV Agenda//EN\nBEGIN:VTODO\n" +
            out.join("\n") + "\nEND:VTODO\nEND:VCALENDAR\n";
+}
+
+function formatDateStamp(date) {
+    return date.getFullYear() + pad(date.getMonth() + 1) + pad(date.getDate());
+}
+
+function formatLocalDateTimeStamp(date) {
+    return date.getFullYear() + pad(date.getMonth() + 1) + pad(date.getDate()) + "T" +
+           pad(date.getHours()) + pad(date.getMinutes()) + pad(date.getSeconds());
+}
+
+// Builds a brand-new VTODO's ICS text for creation. `due` is an optional
+// Date (treated as a DATE, not DATE-TIME - due dates don't need a time of
+// day for this app's purposes). `parentUid` is optional, for creating a
+// subtask under an existing task.
+function buildVTodoIcs(opts) {
+    var lines = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//KDE-Caldav//CalDAV Agenda//EN",
+        "BEGIN:VTODO",
+        "UID:" + opts.uid,
+        "DTSTAMP:" + formatDateTimeUTC(new Date()),
+        "SUMMARY:" + escapeText(opts.summary),
+        "STATUS:NEEDS-ACTION",
+        "PERCENT-COMPLETE:0"
+    ];
+    if (opts.due) lines.push("DUE;VALUE=DATE:" + formatDateStamp(opts.due));
+    if (opts.parentUid) lines.push("RELATED-TO:" + opts.parentUid);
+    lines.push("END:VTODO", "END:VCALENDAR", "");
+    return lines.join("\n");
+}
+
+// Builds a brand-new VEVENT's ICS text for creation. `start`/`end` are
+// Dates; when `allDay` is true they're written as DATE values (end is
+// exclusive per RFC 5545, so callers should pass the day *after* the last
+// all-day date), otherwise as floating (no TZID/UTC) DATE-TIME values in
+// the desktop's local wall-clock time.
+function buildVEventIcs(opts) {
+    var lines = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//KDE-Caldav//CalDAV Agenda//EN",
+        "BEGIN:VEVENT",
+        "UID:" + opts.uid,
+        "DTSTAMP:" + formatDateTimeUTC(new Date()),
+        "SUMMARY:" + escapeText(opts.summary)
+    ];
+    if (opts.allDay) {
+        lines.push("DTSTART;VALUE=DATE:" + formatDateStamp(opts.start));
+        lines.push("DTEND;VALUE=DATE:" + formatDateStamp(opts.end));
+    } else {
+        lines.push("DTSTART:" + formatLocalDateTimeStamp(opts.start));
+        lines.push("DTEND:" + formatLocalDateTimeStamp(opts.end));
+    }
+    if (opts.location) lines.push("LOCATION:" + escapeText(opts.location));
+    lines.push("END:VEVENT", "END:VCALENDAR", "");
+    return lines.join("\n");
 }

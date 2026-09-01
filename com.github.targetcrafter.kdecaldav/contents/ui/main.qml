@@ -20,6 +20,10 @@ PlasmoidItem {
     property bool isLoading: false
     property string lastError: ""
     property date lastUpdated
+    // [{ href, name, color, kinds }], refreshed alongside agendaItems - fed
+    // to FullRepresentation's add-item calendar pickers.
+    property var availableCalendars: []
+    property string createError: ""
 
     property bool accountConfigured: plasmoid.configuration.serverUrl.length > 0 &&
                                       plasmoid.configuration.username.length > 0 &&
@@ -46,9 +50,13 @@ PlasmoidItem {
         lastError: root.lastError
         lastUpdated: root.lastUpdated
         accountConfigured: root.accountConfigured
+        availableCalendars: root.availableCalendars
+        createError: root.createError
         onRefreshRequested: root.refresh()
         onToggleTask: root.toggleTaskCompletion(task)
         onOpenConfigureRequested: plasmoid.internalAction("configure").trigger()
+        onCreateTaskRequested: root.createTask(calendarHref, summary, due)
+        onCreateEventRequested: root.createEvent(calendarHref, summary, start, end, allDay)
     }
 
     Timer {
@@ -119,6 +127,7 @@ PlasmoidItem {
         }
         var calendars = enabledCalendarList();
         console.log("CalDAV Agenda: refresh() - enabled calendars:", JSON.stringify(calendars));
+        availableCalendars = calendars;
         if (calendars.length === 0) {
             lastError = "nocalendars";
             agendaItems = [];
@@ -249,6 +258,36 @@ PlasmoidItem {
         return task.priority > 0 ? task.priority : 10;
     }
 
+    // Re-orders an already-sorted list of tasks so a subtask (parentUid
+    // pointing at another task's uid) immediately follows its parent,
+    // recursively, and stamps a `depth` (0 = top-level) used for visual
+    // indentation. A subtask whose parent isn't in this same list (e.g. it
+    // fell into a different day-bucket, or the parent is filtered out) is
+    // just treated as top-level here - there's no sensible bucket to move
+    // it into.
+    function orderTasksWithHierarchy(tasks) {
+        var byUid = {};
+        tasks.forEach(function (t) { if (t.uid) byUid[t.uid] = t; });
+        var childrenOf = {};
+        var roots = [];
+        tasks.forEach(function (t) {
+            var parent = t.parentUid && byUid[t.parentUid];
+            if (parent && parent !== t) {
+                (childrenOf[parent.uid] = childrenOf[parent.uid] || []).push(t);
+            } else {
+                roots.push(t);
+            }
+        });
+        var out = [];
+        function visit(t, depth) {
+            t.depth = depth;
+            out.push(t);
+            (childrenOf[t.uid] || []).forEach(function (c) { visit(c, depth + 1); });
+        }
+        roots.forEach(function (t) { visit(t, 0); });
+        return out;
+    }
+
     function sortEvents(a, b) {
         if (a.allDay !== b.allDay) return a.allDay ? -1 : 1;
         return a.dtstart.getTime() - b.dtstart.getTime();
@@ -285,7 +324,7 @@ PlasmoidItem {
         if (overdue.length > 0) {
             overdue.sort(function (a, b) { return a.due.getTime() - b.due.getTime(); });
             out.push({ type: "sectionHeader", label: "overdue", count: overdue.length });
-            overdue.forEach(function (t) { out.push({ type: "task", data: t }); });
+            orderTasksWithHierarchy(overdue).forEach(function (t) { out.push({ type: "task", data: t }); });
         }
 
         var start = DateUtils.startOfDay(now);
@@ -298,12 +337,13 @@ PlasmoidItem {
             if (dayEvents.length === 0 && dayTasks.length === 0) continue;
             out.push({ type: "dayHeader", date: d });
             dayEvents.forEach(function (e) { out.push({ type: "event", data: e }); });
-            dayTasks.forEach(function (t) { out.push({ type: "task", data: t }); });
+            orderTasksWithHierarchy(dayTasks).forEach(function (t) { out.push({ type: "task", data: t }); });
         }
 
         if (showTasks && noDue.length > 0) {
+            noDue.sort(function (a, b) { return priorityRank(a) - priorityRank(b); });
             out.push({ type: "sectionHeader", label: "noDueDate", count: noDue.length });
-            noDue.forEach(function (t) { out.push({ type: "task", data: t }); });
+            orderTasksWithHierarchy(noDue).forEach(function (t) { out.push({ type: "task", data: t }); });
         }
 
         agendaItems = out;
@@ -329,6 +369,38 @@ PlasmoidItem {
             plasmoid.configuration.appPassword, task.href, task.etag, icsText,
             function (err) {
                 if (!err) root.refresh();
+            });
+    }
+
+    function createTask(calendarHref, summary, due) {
+        createError = "";
+        var uid = ICAL.generateUid();
+        var icsText = ICAL.buildVTodoIcs({ uid: uid, summary: summary, due: due || null, parentUid: null });
+        CalDAV.createResource(plasmoid.configuration.serverUrl, plasmoid.configuration.username,
+            plasmoid.configuration.appPassword, calendarHref, uid, icsText,
+            function (err) {
+                if (err) {
+                    console.warn("CalDAV Agenda: failed to create task:", err);
+                    createError = errorSummary(err);
+                } else {
+                    root.refresh();
+                }
+            });
+    }
+
+    function createEvent(calendarHref, summary, start, end, allDay) {
+        createError = "";
+        var uid = ICAL.generateUid();
+        var icsText = ICAL.buildVEventIcs({ uid: uid, summary: summary, start: start, end: end, allDay: allDay });
+        CalDAV.createResource(plasmoid.configuration.serverUrl, plasmoid.configuration.username,
+            plasmoid.configuration.appPassword, calendarHref, uid, icsText,
+            function (err) {
+                if (err) {
+                    console.warn("CalDAV Agenda: failed to create event:", err);
+                    createError = errorSummary(err);
+                } else {
+                    root.refresh();
+                }
             });
     }
 

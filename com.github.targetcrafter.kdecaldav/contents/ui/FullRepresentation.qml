@@ -13,10 +13,19 @@ Item {
     property string lastError: ""
     property date lastUpdated
     property bool accountConfigured: false
+    // [{ href, name, color, kinds }], for the add-item calendar pickers
+    property var availableCalendars: []
+    // Error from the last create attempt (distinct from lastError, which
+    // governs the whole-list placeholder) - shown inline in the add bar.
+    property string createError: ""
+
+    property bool showAddBar: false
 
     signal refreshRequested()
     signal toggleTask(var task)
     signal openConfigureRequested()
+    signal createTaskRequested(string calendarHref, string summary, var due)
+    signal createEventRequested(string calendarHref, string summary, var start, var end, bool allDay)
 
     Layout.minimumWidth: Kirigami.Units.gridUnit * 20
     Layout.minimumHeight: Kirigami.Units.gridUnit * 24
@@ -48,6 +57,15 @@ Item {
             }
 
             PlasmaComponents3.ToolButton {
+                icon.name: "list-add"
+                checked: fullRep.showAddBar
+                checkable: true
+                onClicked: fullRep.showAddBar = !fullRep.showAddBar
+                PlasmaComponents3.ToolTip.text: i18n("Add event or task…")
+                PlasmaComponents3.ToolTip.visible: hovered
+            }
+
+            PlasmaComponents3.ToolButton {
                 icon.name: "view-refresh"
                 onClicked: fullRep.refreshRequested()
                 PlasmaComponents3.ToolTip.text: i18n("Refresh")
@@ -63,6 +81,16 @@ Item {
         }
 
         Kirigami.Separator { Layout.fillWidth: true }
+
+        AddItemBar {
+            visible: fullRep.showAddBar
+            calendars: fullRep.availableCalendars
+            externalError: fullRep.createError
+            onCreateTask: fullRep.createTaskRequested(calendarHref, summary, due)
+            onCreateEvent: fullRep.createEventRequested(calendarHref, summary, start, end, allDay)
+        }
+
+        Kirigami.Separator { Layout.fillWidth: true; visible: fullRep.showAddBar }
 
         PlasmaExtras.PlaceholderMessage {
             Layout.alignment: Qt.AlignCenter

@@ -17,7 +17,7 @@
         "Id": "com.github.targetcrafter.kdecaldav",
         "License": "GPL-3.0-or-later",
         "Name": "CalDAV Agenda",
-        "Version": "0.3.1",
+        "Version": "0.4.0",
         "Website": "https://github.com/TargetCrafter/KDE-Caldav"
     },
     "X-Plasma-API-Minimum-Version": "6.0"

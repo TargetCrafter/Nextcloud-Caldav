@@ -242,6 +242,19 @@ function putTodo(serverUrl, username, password, todoHref, etag, icsText, callbac
     });
 }
 
+// Creates a brand-new calendar object resource at <calendarHref><uid>.ics.
+// If-None-Match: * asks the server to refuse the write if a resource with
+// that name already exists, rather than silently overwriting it - shouldn't
+// ever trigger given uid is a fresh generateUid(), but costs nothing.
+function createResource(serverUrl, username, password, calendarHref, uid, icsText, callback) {
+    var href = calendarHref + (calendarHref.charAt(calendarHref.length - 1) === "/" ? "" : "/") + uid + ".ics";
+    var url = resolveHref(serverUrl, href);
+    var headers = { "Content-Type": "text/calendar; charset=utf-8", "If-None-Match": "*" };
+    sendRequest("PUT", url, username, password, headers, icsText, function (err) {
+        callback(err, href);
+    });
+}
+
 // --- Nextcloud Login Flow v2 --------------------------------------------
 // https://docs.nextcloud.com/server/latest/developer_manual/client_apis/LoginFlow/index.html#login-flow-v2
 //

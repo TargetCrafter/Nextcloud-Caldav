@@ -18,7 +18,13 @@ file or with `kpackagetool6`.
 - Events grouped by day ("Today", "Tomorrow", weekday names), with
   recurring events expanded server-side
 - Tasks (VTODO) grouped into Overdue / due-today / due-later / no due date,
-  with a checkbox to mark them done directly from the widget
+  with a checkbox to mark them done directly from the widget, and subtasks
+  (linked via `RELATED-TO`, e.g. from Nextcloud Tasks) shown indented under
+  their parent
+- Quick-add for both events and tasks, right from the widget
+- Each event/task renders as its own card with a hover highlight, and tasks
+  get a distinct tint from events so the two are easy to tell apart at a
+  glance
 - Panel view shows the next event's countdown, today's event count, or just
   an icon — your choice
 - Per-calendar color coding
@@ -144,7 +150,11 @@ To remove it: `kpackagetool6 --type Plasma/Applet --remove com.github.targetcraf
 - Discovery assumes the standard Nextcloud CalDAV layout
   (`/remote.php/dav/calendars/<username>/…`); servers with a different
   principal/calendar-home layout aren't auto-discovered.
-- No event/task creation or editing beyond the done/not-done toggle.
+- Creating a new event or task is supported (via the "+" button); editing
+  or deleting an *existing* one isn't, beyond the done/not-done toggle.
+  Date/time entry for new events is plain `YYYY-MM-DD`/`HH:MM` text fields,
+  not a picker widget. Creating a task as a subtask of another isn't
+  exposed in the UI (only reading and indenting existing subtasks is).
 
 ## Package layout
 
