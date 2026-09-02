@@ -115,15 +115,17 @@ ColumnLayout {
 
                         RowLayout {
                             Layout.alignment: Qt.AlignHCenter
-                            spacing: 2
+                            spacing: Kirigami.Units.smallSpacing / 2
 
                             Repeater {
                                 model: cell.dayColors
                                 delegate: Rectangle {
-                                    width: Kirigami.Units.smallSpacing * 0.7
+                                    width: Kirigami.Units.smallSpacing * 1.6
                                     height: width
                                     radius: width / 2
                                     color: modelData
+                                    border.width: 1
+                                    border.color: Qt.rgba(0, 0, 0, 0.35)
                                 }
                             }
                         }

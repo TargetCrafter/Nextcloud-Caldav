@@ -196,30 +196,38 @@ Item {
                 text: Qt.formatDate(fullRep.selectedDate, "dddd · d MMMM")
             }
 
+            PlasmaComponents3.Label {
+                Layout.fillWidth: true
+                Layout.margins: Kirigami.Units.smallSpacing
+                Layout.topMargin: Kirigami.Units.gridUnit
+                horizontalAlignment: Text.AlignHCenter
+                visible: fullRep.selectedDayEvents.length === 0
+                opacity: 0.6
+                text: i18n("No events this day.")
+            }
+
             PlasmaComponents3.ScrollView {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
+                visible: fullRep.selectedDayEvents.length > 0
                 clip: true
 
-                ColumnLayout {
-                    width: parent.width
+                // Same ScrollView+ListView+width-bound-delegate shape as the
+                // agenda list above: a plain ColumnLayout/Repeater here
+                // previously left the panel with no propagated width once
+                // wrapped in ScrollView's auto-Flickable, collapsing every
+                // EventDelegate to zero size - i.e. visibly empty even
+                // though selectedDayEvents had entries.
+                ListView {
+                    id: dayEventsList
+                    model: fullRep.selectedDayEvents
                     spacing: Kirigami.Units.smallSpacing
+                    boundsBehavior: Flickable.StopAtBounds
 
-                    PlasmaComponents3.Label {
-                        Layout.fillWidth: true
-                        Layout.margins: Kirigami.Units.smallSpacing
-                        visible: fullRep.selectedDayEvents.length === 0
-                        opacity: 0.6
-                        text: i18n("No events this day.")
-                    }
-
-                    Repeater {
-                        model: fullRep.selectedDayEvents
-                        delegate: EventDelegate {
-                            Layout.fillWidth: true
-                            eventData: modelData
-                            currentTime: fullRep.currentTime
-                        }
+                    delegate: EventDelegate {
+                        width: dayEventsList.width
+                        eventData: modelData
+                        currentTime: fullRep.currentTime
                     }
                 }
             }

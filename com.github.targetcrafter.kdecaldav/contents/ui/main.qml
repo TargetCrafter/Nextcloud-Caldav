@@ -131,7 +131,7 @@ PlasmoidItem {
     }
 
     Component.onCompleted: {
-        console.log("CalDAV Agenda: build 0.4.4 starting");
+        console.log("CalDAV Agenda: build 0.4.5 starting");
         refresh();
         if (plasmoid.configuration.viewMode === 1 /* Month */) refreshMonth(monthCursor);
     }
