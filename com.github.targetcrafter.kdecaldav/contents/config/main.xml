@@ -38,6 +38,15 @@
     </entry>
   </group>
   <group name="General">
+    <entry name="displayMode" type="Enum">
+      <label>What to show</label>
+      <choices>
+        <choice name="Combined"/>
+        <choice name="EventsOnly"/>
+        <choice name="TasksOnly"/>
+      </choices>
+      <default>Combined</default>
+    </entry>
     <entry name="daysAhead" type="Int">
       <label>How many days of upcoming events to show</label>
       <default>14</default>
@@ -64,6 +73,14 @@
     </entry>
   </group>
   <group name="Appearance">
+    <entry name="viewMode" type="Enum">
+      <label>Agenda layout</label>
+      <choices>
+        <choice name="List"/>
+        <choice name="Month"/>
+      </choices>
+      <default>List</default>
+    </entry>
     <entry name="compactMode" type="Enum">
       <label>What the panel icon/label shows</label>
       <choices>

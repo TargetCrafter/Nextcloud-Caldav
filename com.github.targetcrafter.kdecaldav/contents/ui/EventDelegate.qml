@@ -20,7 +20,11 @@ Item {
         return !!end && end.getTime() < currentTime.getTime();
     }
 
-    implicitHeight: row.implicitHeight + Kirigami.Units.largeSpacing
+    // Match the row's own top/bottom inset (see anchors.margins below)
+    // exactly, so the card's implicit height doesn't drift from the row's
+    // natural content height - a mismatch there left the RowLayout taller
+    // than its content and pushed the extra slack unevenly to one side.
+    implicitHeight: row.implicitHeight + Kirigami.Units.mediumSpacing * 2
 
     opacity: isPast ? 0.5 : 1
 

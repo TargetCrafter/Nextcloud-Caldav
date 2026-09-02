@@ -9,7 +9,22 @@ ColumnLayout {
 
     // [{ href, name, color, kinds }]
     property var calendars: []
+    // "task" / "event" / "" - set when the widget is restricted to a single
+    // display mode (see main.xml's displayMode), so there's nothing to
+    // switch between and the tab row is just noise.
+    property string lockedType: ""
     property bool isTask: true
+    // Deliberately imperative rather than a binding to lockedType: isTask
+    // is also assigned imperatively by the tab row's onCurrentIndexChanged
+    // below, and a declarative binding here would get silently clobbered
+    // the first time that handler runs (currentIndex reacting to isTask,
+    // then writing isTask back, breaking this binding for good).
+    onLockedTypeChanged: bar.applyLockedType()
+    Component.onCompleted: bar.applyLockedType()
+    function applyLockedType() {
+        if (lockedType === "task") isTask = true;
+        else if (lockedType === "event") isTask = false;
+    }
     // Error surfaced from the actual CalDAV write (as opposed to the local
     // field-validation errors below), bound in from outside.
     property string externalError: ""
@@ -29,6 +44,7 @@ ColumnLayout {
 
     PlasmaComponents3.TabBar {
         id: typeBar
+        visible: bar.lockedType === ""
         // TabBar splits its own width evenly between tabs; left to its
         // implicit width it ends up too narrow for "Event", wrapping the
         // text mid-word. A fixed, generous preferred width avoids that

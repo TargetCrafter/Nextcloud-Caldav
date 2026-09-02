@@ -29,6 +29,18 @@ file or with `kpackagetool6`.
   an icon — your choice
 - Per-calendar color coding
 - Configurable look-ahead window and refresh interval
+- Restrict a widget instance to events only, tasks only, or both combined —
+  useful for placing separate calendar and to-do widgets side by side
+- Optional month-calendar layout (in place of the agenda list), with colored
+  dots marking days that have events; click a day to see what's on it
+
+## Multiple widgets: separate calendar and to-do lists
+
+Each widget instance has its own **Show** setting (Configure… → Appearance):
+*Events and tasks*, *Events only*, or *Tasks only*. Add the widget to your
+panel or desktop twice and set one instance to Events only and the other to
+Tasks only to get separate calendar and to-do widgets, each still backed by
+the same Nextcloud account and calendar selection.
 
 ## Installing
 
@@ -155,6 +167,10 @@ To remove it: `kpackagetool6 --type Plasma/Applet --remove com.github.targetcraf
   Date/time entry for new events is plain `YYYY-MM-DD`/`HH:MM` text fields,
   not a picker widget. Creating a task as a subtask of another isn't
   exposed in the UI (only reading and indenting existing subtasks is).
+- The month-calendar layout shows events only (no task due dates), and
+  isn't available when a widget instance is set to Tasks only. Browsing to
+  a different month issues its own fetch scoped to that month, separate
+  from the agenda list's look-ahead window.
 
 ## Package layout
 

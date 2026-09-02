@@ -15,6 +15,17 @@ function addDays(date, days) {
     return d;
 }
 
+function startOfMonth(date) {
+    return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+// Always returns the 1st of the resulting month (months is a count, not a
+// day-preserving offset) - callers that need a specific day within it add
+// that separately.
+function addMonths(date, months) {
+    return new Date(date.getFullYear(), date.getMonth() + months, 1);
+}
+
 function daysBetween(a, b) {
     var msPerDay = 24 * 60 * 60 * 1000;
     return Math.round((startOfDay(b).getTime() - startOfDay(a).getTime()) / msPerDay);

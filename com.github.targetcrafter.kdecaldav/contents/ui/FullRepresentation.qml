@@ -5,6 +5,8 @@ import org.kde.plasma.components as PlasmaComponents3
 import org.kde.plasma.extras as PlasmaExtras
 import org.kde.kirigami as Kirigami
 
+import "../code/dateutils.js" as DateUtils
+
 Item {
     id: fullRep
 
@@ -20,13 +22,45 @@ Item {
     property string createError: ""
     property date currentTime
 
+    // Month-calendar view (Appearance setting "viewMode"), fed from root's
+    // own refreshMonth() - see main.qml.
+    property var monthEvents: []
+    property bool monthLoading: false
+    property date monthCursor
+    property date selectedDate: new Date()
+
+    readonly property bool monthMode: plasmoid.configuration.viewMode === 1 /* Month */ &&
+                                       plasmoid.configuration.displayMode !== 2 /* TasksOnly */
+    readonly property var selectedDayEvents: computeSelectedDayEvents()
+
+    onMonthCursorChanged: fullRep.selectedDate = new Date(fullRep.monthCursor)
+
     property bool showAddBar: false
+
+    readonly property string addLockedType: {
+        var mode = plasmoid.configuration.displayMode;
+        if (mode === 1 /* EventsOnly */) return "event";
+        if (mode === 2 /* TasksOnly */) return "task";
+        return "";
+    }
 
     signal refreshRequested()
     signal toggleTask(var task)
     signal openConfigureRequested()
     signal createTaskRequested(string calendarHref, string summary, var due)
     signal createEventRequested(string calendarHref, string summary, var start, var end, bool allDay)
+    signal monthNavigate(int delta)
+
+    function computeSelectedDayEvents() {
+        var list = fullRep.monthEvents.filter(function (e) {
+            return e.dtstart && DateUtils.isSameDay(e.dtstart, fullRep.selectedDate);
+        });
+        list.sort(function (a, b) {
+            if (a.allDay !== b.allDay) return a.allDay ? -1 : 1;
+            return a.dtstart.getTime() - b.dtstart.getTime();
+        });
+        return list;
+    }
 
     Layout.minimumWidth: Kirigami.Units.gridUnit * 20
     Layout.minimumHeight: Kirigami.Units.gridUnit * 24
@@ -86,6 +120,7 @@ Item {
         AddItemBar {
             visible: fullRep.showAddBar
             calendars: fullRep.availableCalendars
+            lockedType: fullRep.addLockedType
             externalError: fullRep.createError
             onCreateTask: fullRep.createTaskRequested(calendarHref, summary, due)
             onCreateEvent: fullRep.createEventRequested(calendarHref, summary, start, end, allDay)
@@ -98,7 +133,7 @@ Item {
             Layout.fillWidth: true
             Layout.maximumWidth: parent.width - Kirigami.Units.gridUnit * 4
             Layout.topMargin: Kirigami.Units.gridUnit * 3
-            visible: fullRep.showPlaceholder
+            visible: !fullRep.monthMode && fullRep.showPlaceholder
             iconName: fullRep.placeholderIcon()
             text: fullRep.placeholderTitle()
             explanation: fullRep.placeholderExplanation()
@@ -109,7 +144,7 @@ Item {
         PlasmaComponents3.ScrollView {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            visible: !fullRep.showPlaceholder
+            visible: !fullRep.monthMode && !fullRep.showPlaceholder
             clip: true
 
             ListView {
@@ -130,6 +165,62 @@ Item {
                         }
                     }
                     property var itemData: modelData
+                }
+            }
+        }
+
+        ColumnLayout {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            visible: fullRep.monthMode
+            spacing: 0
+
+            MonthView {
+                Layout.fillWidth: true
+                Layout.margins: Kirigami.Units.smallSpacing
+                monthEvents: fullRep.monthEvents
+                monthLoading: fullRep.monthLoading
+                monthCursor: fullRep.monthCursor
+                selectedDate: fullRep.selectedDate
+                currentTime: fullRep.currentTime
+                onNavigate: fullRep.monthNavigate(delta)
+                onDaySelected: fullRep.selectedDate = day
+            }
+
+            Kirigami.Separator { Layout.fillWidth: true }
+
+            PlasmaComponents3.Label {
+                Layout.fillWidth: true
+                Layout.margins: Kirigami.Units.smallSpacing
+                font.bold: true
+                text: Qt.formatDate(fullRep.selectedDate, "dddd · d MMMM")
+            }
+
+            PlasmaComponents3.ScrollView {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                clip: true
+
+                ColumnLayout {
+                    width: parent.width
+                    spacing: Kirigami.Units.smallSpacing
+
+                    PlasmaComponents3.Label {
+                        Layout.fillWidth: true
+                        Layout.margins: Kirigami.Units.smallSpacing
+                        visible: fullRep.selectedDayEvents.length === 0
+                        opacity: 0.6
+                        text: i18n("No events this day.")
+                    }
+
+                    Repeater {
+                        model: fullRep.selectedDayEvents
+                        delegate: EventDelegate {
+                            Layout.fillWidth: true
+                            eventData: modelData
+                            currentTime: fullRep.currentTime
+                        }
+                    }
                 }
             }
         }

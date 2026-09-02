@@ -12,7 +12,8 @@ Item {
     readonly property bool completed: taskData.status === "COMPLETED"
     readonly property int depth: taskData.depth || 0
 
-    implicitHeight: row.implicitHeight + Kirigami.Units.largeSpacing
+    // See EventDelegate.qml for why this must match the row's own margins.
+    implicitHeight: row.implicitHeight + Kirigami.Units.mediumSpacing * 2
 
     HoverHandler {
         id: hover

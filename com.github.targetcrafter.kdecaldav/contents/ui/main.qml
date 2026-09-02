@@ -30,6 +30,16 @@ PlasmoidItem {
     // minutes - as long as 4 hours - stale otherwise).
     property date currentTime: new Date()
 
+    // Separate data/loading state for the month-calendar view (Appearance
+    // setting "viewMode"). Kept independent of agendaItems above: browsing
+    // to a different month needs events from outside the daysAhead window
+    // refresh() fetches, so it's populated by its own refreshMonth() calls.
+    property var monthEvents: []
+    property bool monthLoading: false
+    property string monthError: ""
+    property date monthCursor: DateUtils.startOfMonth(new Date())
+    property int monthRequestToken: 0
+
     property bool accountConfigured: plasmoid.configuration.serverUrl.length > 0 &&
                                       plasmoid.configuration.username.length > 0 &&
                                       plasmoid.configuration.appPassword.length > 0
@@ -37,7 +47,7 @@ PlasmoidItem {
     Plasmoid.icon: "view-calendar"
     Plasmoid.title: i18n("CalDAV Agenda")
     toolTipMainText: nextEvent ? nextEvent.summary : i18n("CalDAV Agenda")
-    toolTipSubText: lastError !== "" ? errorSummary(lastError) : i18n("%1 events today, %2 tasks overdue", todayCount, overdueCount)
+    toolTipSubText: lastError !== "" ? errorSummary(lastError) : toolTipSummary()
 
     Plasmoid.status: (overdueCount > 0) ? PlasmaCore.Types.ActiveStatus : PlasmaCore.Types.PassiveStatus
 
@@ -58,11 +68,15 @@ PlasmoidItem {
         availableCalendars: root.availableCalendars
         createError: root.createError
         currentTime: root.currentTime
+        monthEvents: root.monthEvents
+        monthLoading: root.monthLoading
+        monthCursor: root.monthCursor
         onRefreshRequested: root.refresh()
         onToggleTask: root.toggleTaskCompletion(task)
         onOpenConfigureRequested: plasmoid.internalAction("configure").trigger()
         onCreateTaskRequested: root.createTask(calendarHref, summary, due)
         onCreateEventRequested: root.createEvent(calendarHref, summary, start, end, allDay)
+        onMonthNavigate: root.changeMonth(delta)
     }
 
     Timer {
@@ -107,11 +121,19 @@ PlasmoidItem {
         function onDaysAheadChanged() { root.refresh() }
         function onShowTasksChanged() { root.refresh() }
         function onShowCompletedTasksChanged() { root.refresh() }
+        function onDisplayModeChanged() { root.refresh() }
+        function onViewModeChanged() {
+            if (plasmoid.configuration.viewMode === 1 /* Month */ &&
+                root.monthEvents.length === 0 && !root.monthLoading) {
+                root.refreshMonth(root.monthCursor);
+            }
+        }
     }
 
     Component.onCompleted: {
-        console.log("CalDAV Agenda: build 0.4.3 starting");
+        console.log("CalDAV Agenda: build 0.4.4 starting");
         refresh();
+        if (plasmoid.configuration.viewMode === 1 /* Month */) refreshMonth(monthCursor);
     }
 
     function enabledCalendarList() {
@@ -131,6 +153,17 @@ PlasmoidItem {
             });
         }
         return out;
+    }
+
+    function wantsEvents() {
+        return plasmoid.configuration.displayMode !== 2 /* TasksOnly */;
+    }
+
+    function wantsTasks() {
+        var mode = plasmoid.configuration.displayMode;
+        if (mode === 1 /* EventsOnly */) return false;
+        if (mode === 2 /* TasksOnly */) return true;
+        return plasmoid.configuration.showTasks;
     }
 
     function refresh() {
@@ -181,7 +214,7 @@ PlasmoidItem {
         // forever, since pending would never reach zero.
         calendars.forEach(function (cal, index) {
             console.log("CalDAV Agenda: processing calendar", index + 1, "of", calendars.length, "-", cal.name);
-            if (cal.kinds.indexOf("VEVENT") !== -1) {
+            if (wantsEvents() && cal.kinds.indexOf("VEVENT") !== -1) {
                 pending++;
                 // The request-initiation call itself is also wrapped in
                 // try/catch, not just its response callback: if it throws
@@ -226,7 +259,7 @@ PlasmoidItem {
                     checkDone();
                 }
             }
-            if (plasmoid.configuration.showTasks && cal.kinds.indexOf("VTODO") !== -1) {
+            if (wantsTasks() && cal.kinds.indexOf("VTODO") !== -1) {
                 pending++;
                 try {
                     console.log("CalDAV Agenda: requesting tasks for", cal.name, "at", CalDAV.resolveHref(serverUrl, cal.href));
@@ -314,7 +347,7 @@ PlasmoidItem {
 
         var now = new Date();
         var showCompleted = plasmoid.configuration.showCompletedTasks;
-        var showTasks = plasmoid.configuration.showTasks;
+        var showTasks = wantsTasks();
         todos = showTasks ? todos.filter(function (t) { return showCompleted || t.status !== "COMPLETED"; }) : [];
 
         var overdue = todos.filter(function (t) { return t.due && t.status !== "COMPLETED" && DateUtils.isOverdue(t.due, now); });
@@ -416,6 +449,90 @@ PlasmoidItem {
                     root.refresh();
                 }
             });
+    }
+
+    function toolTipSummary() {
+        var mode = plasmoid.configuration.displayMode;
+        if (mode === 1 /* EventsOnly */) return i18np("%1 event today", "%1 events today", todayCount);
+        if (mode === 2 /* TasksOnly */) return i18np("%1 task overdue", "%1 tasks overdue", overdueCount);
+        return i18n("%1 events today, %2 tasks overdue", todayCount, overdueCount);
+    }
+
+    function changeMonth(delta) {
+        monthCursor = delta === 0 ? monthCursor : DateUtils.addMonths(monthCursor, delta);
+        refreshMonth(monthCursor);
+    }
+
+    // Populates monthEvents for the given month. Independent of refresh()'s
+    // daysAhead-bounded event fetch above - browsing to a different month
+    // needs a CalDAV request scoped to that month specifically, since
+    // refresh() never requests data outside its own upcoming-days window.
+    function refreshMonth(monthDate) {
+        if (!accountConfigured) return;
+        var calendars = enabledCalendarList().filter(function (c) { return c.kinds.indexOf("VEVENT") !== -1; });
+        var token = ++monthRequestToken;
+        if (calendars.length === 0) {
+            monthEvents = [];
+            monthLoading = false;
+            return;
+        }
+
+        monthLoading = true;
+        monthError = "";
+
+        var serverUrl = plasmoid.configuration.serverUrl;
+        var username = plasmoid.configuration.username;
+        var password = plasmoid.configuration.appPassword;
+
+        var rangeStart = DateUtils.startOfMonth(monthDate);
+        var rangeEnd = DateUtils.addMonths(rangeStart, 1);
+
+        var pending = calendars.length;
+        var collected = [];
+        var firstError = null;
+
+        function checkDone() {
+            pending--;
+            // A newer changeMonth()/refreshMonth() call superseded this one
+            // (e.g. rapid Next-month clicks) - drop this response rather
+            // than clobbering monthEvents with stale data.
+            if (pending <= 0 && token === monthRequestToken) {
+                monthLoading = false;
+                monthError = firstError || "";
+                monthEvents = collected;
+            }
+        }
+
+        calendars.forEach(function (cal) {
+            try {
+                CalDAV.fetchEvents(serverUrl, username, password, cal.href, rangeStart, rangeEnd, function (err, items) {
+                    try {
+                        if (err) {
+                            firstError = firstError || err;
+                            return;
+                        }
+                        items.forEach(function (it) {
+                            try {
+                                var parsed = ICAL.parseCalendarObject(it.icsText, it.href, it.etag, rangeStart, rangeEnd);
+                                parsed.events.forEach(function (e) {
+                                    e.calendarColor = cal.color;
+                                    e.calendarName = cal.name;
+                                    collected.push(e);
+                                });
+                            } catch (parseErr) {
+                                console.warn("CalDAV Agenda: skipping malformed event (month view) in", cal.name, ":", parseErr);
+                            }
+                        });
+                    } finally {
+                        checkDone();
+                    }
+                });
+            } catch (initErr) {
+                console.warn("CalDAV Agenda: failed to start month events request for", cal.name, ":", initErr);
+                firstError = firstError || "network";
+                checkDone();
+            }
+        });
     }
 
     function errorSummary(code) {
