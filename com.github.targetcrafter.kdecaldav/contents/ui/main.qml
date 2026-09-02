@@ -110,7 +110,7 @@ PlasmoidItem {
     }
 
     Component.onCompleted: {
-        console.log("CalDAV Agenda: build 0.4.2 starting");
+        console.log("CalDAV Agenda: build 0.4.3 starting");
         refresh();
     }
 

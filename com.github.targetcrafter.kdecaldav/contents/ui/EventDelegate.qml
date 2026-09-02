@@ -32,8 +32,6 @@ Item {
         anchors.fill: parent
         radius: Kirigami.Units.cornerRadius
         color: hover.hovered ? Kirigami.Theme.hoverColor : Kirigami.Theme.alternateBackgroundColor
-        border.width: 1
-        border.color: Kirigami.Theme.textColor
         opacity: hover.hovered ? 1 : 0.35
     }
 

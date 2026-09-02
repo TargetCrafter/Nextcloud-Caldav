@@ -25,8 +25,6 @@ Item {
         // so the two kinds of agenda item are distinguishable at a glance
         // even before reading their content.
         color: hover.hovered ? Kirigami.Theme.hoverColor : Kirigami.Theme.neutralBackgroundColor
-        border.width: 1
-        border.color: Kirigami.Theme.neutralTextColor
         opacity: hover.hovered ? 1 : 0.35
     }
 
