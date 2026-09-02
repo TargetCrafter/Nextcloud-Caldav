@@ -18,6 +18,7 @@ Item {
     // Error from the last create attempt (distinct from lastError, which
     // governs the whole-list placeholder) - shown inline in the add bar.
     property string createError: ""
+    property date currentTime
 
     property bool showAddBar: false
 
@@ -161,6 +162,7 @@ Item {
         id: eventComponent
         EventDelegate {
             eventData: parent.itemData.data
+            currentTime: fullRep.currentTime
         }
     }
 

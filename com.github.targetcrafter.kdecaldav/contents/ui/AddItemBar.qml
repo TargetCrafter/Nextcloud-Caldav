@@ -29,7 +29,12 @@ ColumnLayout {
 
     PlasmaComponents3.TabBar {
         id: typeBar
+        // TabBar splits its own width evenly between tabs; left to its
+        // implicit width it ends up too narrow for "Event", wrapping the
+        // text mid-word. A fixed, generous preferred width avoids that
+        // without stretching across the whole bar.
         Layout.fillWidth: false
+        Layout.preferredWidth: Kirigami.Units.gridUnit * 9
         currentIndex: bar.isTask ? 0 : 1
         onCurrentIndexChanged: {
             bar.isTask = currentIndex === 0;

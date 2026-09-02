@@ -7,11 +7,18 @@ Item {
     id: delegate
 
     required property var eventData
+    // Ticks once a minute (see main.qml's clockTimer), so isPast below
+    // stays live rather than being frozen at whatever it was at the last
+    // refresh - which could be up to refreshInterval minutes (as long as 4
+    // hours) stale otherwise.
+    property date currentTime
 
     // An event that has already ended (or, for a point-in-time event with
-    // no end, already started) earlier today is fixed at refresh time in
-    // main.qml's finishRefresh(), not re-evaluated live minute-to-minute.
-    readonly property bool isPast: eventData.isPast === true
+    // no end, already started) earlier today.
+    readonly property bool isPast: {
+        var end = eventData.dtend || eventData.dtstart;
+        return !!end && end.getTime() < currentTime.getTime();
+    }
 
     implicitHeight: row.implicitHeight + Kirigami.Units.largeSpacing
 

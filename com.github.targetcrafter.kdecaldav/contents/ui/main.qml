@@ -24,6 +24,11 @@ PlasmoidItem {
     // to FullRepresentation's add-item calendar pickers.
     property var availableCalendars: []
     property string createError: ""
+    // Ticks once a minute so "is this event in the past" (see EventDelegate)
+    // stays live between refreshes, rather than being frozen at whatever it
+    // was the last time refresh() happened to run (up to refreshInterval
+    // minutes - as long as 4 hours - stale otherwise).
+    property date currentTime: new Date()
 
     property bool accountConfigured: plasmoid.configuration.serverUrl.length > 0 &&
                                       plasmoid.configuration.username.length > 0 &&
@@ -52,11 +57,20 @@ PlasmoidItem {
         accountConfigured: root.accountConfigured
         availableCalendars: root.availableCalendars
         createError: root.createError
+        currentTime: root.currentTime
         onRefreshRequested: root.refresh()
         onToggleTask: root.toggleTaskCompletion(task)
         onOpenConfigureRequested: plasmoid.internalAction("configure").trigger()
         onCreateTaskRequested: root.createTask(calendarHref, summary, due)
         onCreateEventRequested: root.createEvent(calendarHref, summary, start, end, allDay)
+    }
+
+    Timer {
+        id: clockTimer
+        interval: 60000
+        running: true
+        repeat: true
+        onTriggered: root.currentTime = new Date()
     }
 
     Timer {
@@ -96,7 +110,7 @@ PlasmoidItem {
     }
 
     Component.onCompleted: {
-        console.log("CalDAV Agenda: build 0.4.1 starting");
+        console.log("CalDAV Agenda: build 0.4.2 starting");
         refresh();
     }
 
@@ -316,9 +330,6 @@ PlasmoidItem {
         var eventsByDay = {};
         events.forEach(function (e) {
             if (!e.dtstart) return;
-            // Fixed at refresh time, not re-evaluated live minute-to-minute -
-            // used to fade out events that have already happened today.
-            e.isPast = (e.dtend ? e.dtend.getTime() : e.dtstart.getTime()) < now.getTime();
             var key = DateUtils.dayKey(e.dtstart);
             (eventsByDay[key] = eventsByDay[key] || []).push(e);
         });
