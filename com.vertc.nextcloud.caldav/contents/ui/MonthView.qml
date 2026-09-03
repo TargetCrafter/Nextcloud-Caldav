@@ -124,25 +124,34 @@ ColumnLayout {
                             text: cell.cellDate.getDate()
                         }
 
-                        RowLayout {
+                        Item {
+                            // A plain Item with a hard-fixed height, rather
+                            // than relying on the RowLayout below's own
+                            // Layout.preferredHeight hint - that was still
+                            // letting the row's actual size follow its
+                            // content (0 dots vs several), shifting the day
+                            // number above it up/down between cells in the
+                            // same row. This can't be influenced by the
+                            // Repeater's item count at all.
                             Layout.alignment: Qt.AlignHCenter
-                            // Reserved unconditionally, dots or not - a
-                            // height that only appeared when there were
-                            // dots pushed the day number itself up/down
-                            // between cells that had events and cells that
-                            // didn't, in the same row.
+                            Layout.preferredWidth: dotsRow.implicitWidth
                             Layout.preferredHeight: Kirigami.Units.smallSpacing * 1.6
-                            spacing: Kirigami.Units.smallSpacing / 2
 
-                            Repeater {
-                                model: cell.dayColors
-                                delegate: Rectangle {
-                                    width: Kirigami.Units.smallSpacing * 1.6
-                                    height: width
-                                    radius: width / 2
-                                    color: modelData
-                                    border.width: 1
-                                    border.color: Qt.rgba(0, 0, 0, 0.35)
+                            RowLayout {
+                                id: dotsRow
+                                anchors.centerIn: parent
+                                spacing: Kirigami.Units.smallSpacing / 2
+
+                                Repeater {
+                                    model: cell.dayColors
+                                    delegate: Rectangle {
+                                        width: Kirigami.Units.smallSpacing * 1.6
+                                        height: width
+                                        radius: width / 2
+                                        color: modelData
+                                        border.width: 1
+                                        border.color: Qt.rgba(0, 0, 0, 0.35)
+                                    }
                                 }
                             }
                         }
