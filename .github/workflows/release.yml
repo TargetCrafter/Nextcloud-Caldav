@@ -39,5 +39,5 @@ jobs:
         with:
           tag_name: ${{ steps.tag.outputs.name }}
           target_commitish: ${{ github.sha }}
-          files: com.github.targetcrafter.kdecaldav.plasmoid
+          files: com.vertc.nextcloud.caldav.plasmoid
           generate_release_notes: true

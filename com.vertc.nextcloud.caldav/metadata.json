@@ -14,10 +14,10 @@
             "desktop"
         ],
         "Icon": "view-calendar",
-        "Id": "com.github.targetcrafter.kdecaldav",
+        "Id": "com.vertc.nextcloud.caldav",
         "License": "GPL-3.0-or-later",
-        "Name": "CalDAV Agenda",
-        "Version": "0.5.3",
+        "Name": "Nextcloud Caldav",
+        "Version": "0.5.4",
         "Website": "https://github.com/TargetCrafter/KDE-Caldav"
     },
     "X-Plasma-API-Minimum-Version": "6.0"

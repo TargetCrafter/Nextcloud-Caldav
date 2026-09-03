@@ -4,7 +4,7 @@
 # dialog, without needing a checkout or the command line at all.
 set -euo pipefail
 
-PLUGIN_ID="com.github.targetcrafter.kdecaldav"
+PLUGIN_ID="com.vertc.nextcloud.caldav"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SRC_DIR="$SCRIPT_DIR/$PLUGIN_ID"
 OUT_FILE="$SCRIPT_DIR/$PLUGIN_ID.plasmoid"

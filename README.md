@@ -1,4 +1,4 @@
-# CalDAV Agenda
+# Nextcloud Caldav
 
 A KDE Plasma 6 widget that shows your upcoming Nextcloud events and tasks
 on the desktop or panel, with a clean Kirigami interface: events and tasks
@@ -49,20 +49,20 @@ the same Nextcloud account and calendar selection.
 
 ### Option A: a `.plasmoid` file (no terminal needed)
 
-Grab `com.github.targetcrafter.kdecaldav.plasmoid` from the
+Grab `com.vertc.nextcloud.caldav.plasmoid` from the
 [Releases](https://github.com/TargetCrafter/KDE-Caldav/releases) page (built
 automatically by CI for each tagged version), then either:
 
 - **Right-click the desktop or a panel → Add Widgets… → Get New Widgets…
   → Install Widget From Local File…**, and pick the downloaded file, or
 - run `kpackagetool6 --type Plasma/Applet --install
-  com.github.targetcrafter.kdecaldav.plasmoid` from a terminal.
+  com.vertc.nextcloud.caldav.plasmoid` from a terminal.
 
 To build that file yourself from a checkout instead of downloading it, run
 `./package.sh` — it produces
-`com.github.targetcrafter.kdecaldav.plasmoid` in the repo root, which you
+`com.vertc.nextcloud.caldav.plasmoid` in the repo root, which you
 can then install the same way (or via `./install.sh
-com.github.targetcrafter.kdecaldav.plasmoid`).
+com.vertc.nextcloud.caldav.plasmoid`).
 
 ### Option B: from source
 
@@ -73,13 +73,21 @@ cd KDE-Caldav
 ```
 
 Either way, add the widget from **right-click desktop or panel → Add
-Widgets… → search "CalDAV Agenda"**.
+Widgets… → search "Nextcloud Caldav"**.
 
 To update after pulling new changes, run `./install.sh` again (it detects
 the existing install and upgrades it either from source or from a
 `.plasmoid` file you pass as an argument).
 
-To remove it: `kpackagetool6 --type Plasma/Applet --remove com.github.targetcrafter.kdecaldav`
+To remove it: `kpackagetool6 --type Plasma/Applet --remove com.vertc.nextcloud.caldav`
+
+> **Upgrading from a build before the plugin was renamed?** Versions before
+> the "Nextcloud Caldav" rebrand used the plugin id
+> `com.github.targetcrafter.kdecaldav`. Since that's a different id,
+> `./install.sh` installs the new one alongside the old one rather than
+> upgrading it - remove the old one with `kpackagetool6 --type Plasma/Applet
+> --remove com.github.targetcrafter.kdecaldav` and re-add the widget from
+> Add Widgets… afterward.
 
 ## Setting up your account
 
@@ -191,14 +199,14 @@ To remove it: `kpackagetool6 --type Plasma/Applet --remove com.github.targetcraf
 ## Package layout
 
 ```
-com.github.targetcrafter.kdecaldav/
+com.vertc.nextcloud.caldav/
   metadata.json
   contents/
     ui/          QML: main.qml, Compact/FullRepresentation, delegates, config pages
     config/      main.xml (KConfigXT schema), config.qml (settings page list)
     code/        caldav.js (HTTP/WebDAV + Login Flow v2), ical.js (parsing/RRULE), dateutils.js
 install.sh        installs/upgrades from source or a .plasmoid file
-package.sh         builds com.github.targetcrafter.kdecaldav.plasmoid
+package.sh         builds com.vertc.nextcloud.caldav.plasmoid
 .github/workflows/release.yml   builds and attaches the .plasmoid on a tagged push
 ```
 

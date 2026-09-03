@@ -51,8 +51,8 @@ PlasmoidItem {
                                       plasmoid.configuration.appPassword.length > 0
 
     Plasmoid.icon: "view-calendar"
-    Plasmoid.title: i18n("CalDAV Agenda")
-    toolTipMainText: nextEvent ? nextEvent.summary : i18n("CalDAV Agenda")
+    Plasmoid.title: i18n("Nextcloud Caldav")
+    toolTipMainText: nextEvent ? nextEvent.summary : i18n("Nextcloud Caldav")
     toolTipSubText: lastError !== "" ? errorSummary(lastError) : toolTipSummary()
 
     Plasmoid.status: (overdueCount > 0) ? PlasmaCore.Types.ActiveStatus : PlasmaCore.Types.PassiveStatus
@@ -143,7 +143,7 @@ PlasmoidItem {
     }
 
     Component.onCompleted: {
-        console.log("CalDAV Agenda: build 0.5.3 starting");
+        console.log("Nextcloud Caldav: build 0.5.4 starting");
         refresh();
         if (plasmoid.configuration.viewMode === 1 /* Month */) refreshMonth(monthCursor);
     }
