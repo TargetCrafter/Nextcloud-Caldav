@@ -404,6 +404,51 @@ function patchTodoStatus(todo, completed) {
            out.join("\n") + "\nEND:VTODO\nEND:VCALENDAR\n";
 }
 
+// Rewrites SUMMARY/DUE on an existing task's raw property lines, the same
+// patch-in-place approach as patchTodoStatus above, so STATUS, PRIORITY,
+// RELATED-TO and anything else already on the task survive an edit
+// untouched instead of being dropped by rebuilding the object from
+// scratch. `fields.due` is an optional Date; passing none removes it.
+function patchTodoFields(todo, fields) {
+    var lines = (todo.rawLines || []).slice();
+    var out = [];
+    for (var i = 0; i < lines.length; i++) {
+        var prop = parseLine(lines[i]);
+        if (prop && (prop.name === "SUMMARY" || prop.name === "DUE")) continue;
+        out.push(lines[i]);
+    }
+    out.push("SUMMARY:" + escapeText(fields.summary));
+    if (fields.due) out.push("DUE;VALUE=DATE:" + formatDateStamp(fields.due));
+    return "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//KDE-Caldav//CalDAV Agenda//EN\nBEGIN:VTODO\n" +
+           out.join("\n") + "\nEND:VTODO\nEND:VCALENDAR\n";
+}
+
+// Rewrites SUMMARY/DTSTART/DTEND (and drops any DURATION in favor of an
+// explicit DTEND) in a single-VEVENT ICS blob just fetched fresh via
+// CalDAV.fetchEventResource, patching those specific lines rather than
+// rebuilding the object - so LOCATION, DESCRIPTION, RRULE and anything
+// else this app doesn't otherwise round-trip survive an edit untouched.
+function patchEventFields(icsText, fields) {
+    var lines = unfold(icsText).split("\n").map(function (l) { return l.replace(/\s+$/, ""); }).filter(function (l) { return l.length > 0; });
+    var block = (splitComponents(lines, "VEVENT")[0] || []).slice();
+    var out = [];
+    for (var i = 0; i < block.length; i++) {
+        var prop = parseLine(block[i]);
+        if (prop && (prop.name === "SUMMARY" || prop.name === "DTSTART" || prop.name === "DTEND" || prop.name === "DURATION")) continue;
+        out.push(block[i]);
+    }
+    out.push("SUMMARY:" + escapeText(fields.summary));
+    if (fields.allDay) {
+        out.push("DTSTART;VALUE=DATE:" + formatDateStamp(fields.start));
+        out.push("DTEND;VALUE=DATE:" + formatDateStamp(fields.end));
+    } else {
+        out.push("DTSTART:" + formatLocalDateTimeStamp(fields.start));
+        out.push("DTEND:" + formatLocalDateTimeStamp(fields.end));
+    }
+    return "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//KDE-Caldav//CalDAV Agenda//EN\nBEGIN:VEVENT\n" +
+           out.join("\n") + "\nEND:VEVENT\nEND:VCALENDAR\n";
+}
+
 function formatDateStamp(date) {
     return date.getFullYear() + pad(date.getMonth() + 1) + pad(date.getDate());
 }

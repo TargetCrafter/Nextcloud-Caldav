@@ -24,6 +24,11 @@ PlasmoidItem {
     // to FullRepresentation's add-item calendar pickers.
     property var availableCalendars: []
     property string createError: ""
+    // Error from the last edit/delete attempt, and a counter FullRepresentation
+    // watches to know when to close its edit panel - root has no direct way
+    // to call a function on FullRepresentation, only properties it can react to.
+    property string editError: ""
+    property int editSuccessToken: 0
     // Ticks once a minute so "is this event in the past" (see EventDelegate)
     // stays live between refreshes, rather than being frozen at whatever it
     // was the last time refresh() happened to run (up to refreshInterval
@@ -67,6 +72,8 @@ PlasmoidItem {
         accountConfigured: root.accountConfigured
         availableCalendars: root.availableCalendars
         createError: root.createError
+        editError: root.editError
+        editSuccessToken: root.editSuccessToken
         currentTime: root.currentTime
         monthEvents: root.monthEvents
         monthLoading: root.monthLoading
@@ -76,6 +83,10 @@ PlasmoidItem {
         onOpenConfigureRequested: plasmoid.internalAction("configure").trigger()
         onCreateTaskRequested: root.createTask(calendarHref, summary, due)
         onCreateEventRequested: root.createEvent(calendarHref, summary, start, end, allDay)
+        onEditTaskRequested: root.updateTask(task, summary, due)
+        onEditEventRequested: root.updateEvent(event, summary, start, end, allDay)
+        onDeleteTaskRequested: root.deleteTask(task)
+        onDeleteEventRequested: root.deleteEvent(event)
         onMonthNavigate: root.changeMonth(delta)
         onMonthJump: root.jumpToMonth(month)
     }
@@ -132,7 +143,7 @@ PlasmoidItem {
     }
 
     Component.onCompleted: {
-        console.log("CalDAV Agenda: build 0.4.8 starting");
+        console.log("CalDAV Agenda: build 0.5.0 starting");
         refresh();
         if (plasmoid.configuration.viewMode === 1 /* Month */) refreshMonth(monthCursor);
     }
@@ -250,6 +261,7 @@ PlasmoidItem {
                                     parsed.events.forEach(function (e) {
                                         e.calendarColor = cal.color;
                                         e.calendarName = cal.name;
+                                        e.calendarHref = cal.href;
                                         collectedEvents.push(e);
                                     });
                                 } catch (parseErr) {
@@ -422,10 +434,86 @@ PlasmoidItem {
     function toggleTaskCompletion(task) {
         var completed = task.status !== "COMPLETED";
         var icsText = ICAL.patchTodoStatus(task, completed);
-        CalDAV.putTodo(plasmoid.configuration.serverUrl, plasmoid.configuration.username,
+        CalDAV.updateResource(plasmoid.configuration.serverUrl, plasmoid.configuration.username,
             plasmoid.configuration.appPassword, task.href, task.etag, icsText,
             function (err) {
                 if (!err) root.refresh();
+            });
+    }
+
+    function updateTask(task, summary, due) {
+        editError = "";
+        var icsText = ICAL.patchTodoFields(task, { summary: summary, due: due || null });
+        CalDAV.updateResource(plasmoid.configuration.serverUrl, plasmoid.configuration.username,
+            plasmoid.configuration.appPassword, task.href, task.etag, icsText,
+            function (err) {
+                if (err) {
+                    console.warn("CalDAV Agenda: failed to update task:", err);
+                    editError = errorSummary(err);
+                } else {
+                    root.editSuccessToken++;
+                    root.refresh();
+                }
+            });
+    }
+
+    function deleteTask(task) {
+        editError = "";
+        CalDAV.deleteResource(plasmoid.configuration.serverUrl, plasmoid.configuration.username,
+            plasmoid.configuration.appPassword, task.href, task.etag,
+            function (err) {
+                if (err) {
+                    console.warn("CalDAV Agenda: failed to delete task:", err);
+                    editError = errorSummary(err);
+                } else {
+                    root.editSuccessToken++;
+                    root.refresh();
+                }
+            });
+    }
+
+    // Events don't carry their own resource href/etag from the normal
+    // fetch path (see fetchEventResource's comment in caldav.js), so
+    // editing/deleting one resolves its real resource fresh first, then
+    // acts on that.
+    function updateEvent(event, summary, start, end, allDay) {
+        editError = "";
+        CalDAV.fetchEventResource(plasmoid.configuration.serverUrl, plasmoid.configuration.username,
+            plasmoid.configuration.appPassword, event.calendarHref, event.uid,
+            function (err, resource) {
+                if (err) { console.warn("CalDAV Agenda: failed to locate event for editing:", err); editError = errorSummary(err); return; }
+                var icsText = ICAL.patchEventFields(resource.icsText, { summary: summary, start: start, end: end, allDay: allDay });
+                CalDAV.updateResource(plasmoid.configuration.serverUrl, plasmoid.configuration.username,
+                    plasmoid.configuration.appPassword, resource.href, resource.etag, icsText,
+                    function (err2) {
+                        if (err2) {
+                            console.warn("CalDAV Agenda: failed to update event:", err2);
+                            editError = errorSummary(err2);
+                        } else {
+                            root.editSuccessToken++;
+                            root.refresh();
+                        }
+                    });
+            });
+    }
+
+    function deleteEvent(event) {
+        editError = "";
+        CalDAV.fetchEventResource(plasmoid.configuration.serverUrl, plasmoid.configuration.username,
+            plasmoid.configuration.appPassword, event.calendarHref, event.uid,
+            function (err, resource) {
+                if (err) { console.warn("CalDAV Agenda: failed to locate event for deletion:", err); editError = errorSummary(err); return; }
+                CalDAV.deleteResource(plasmoid.configuration.serverUrl, plasmoid.configuration.username,
+                    plasmoid.configuration.appPassword, resource.href, resource.etag,
+                    function (err2) {
+                        if (err2) {
+                            console.warn("CalDAV Agenda: failed to delete event:", err2);
+                            editError = errorSummary(err2);
+                        } else {
+                            root.editSuccessToken++;
+                            root.refresh();
+                        }
+                    });
             });
     }
 
@@ -532,6 +620,7 @@ PlasmoidItem {
                                 parsed.events.forEach(function (e) {
                                     e.calendarColor = cal.color;
                                     e.calendarName = cal.name;
+                                    e.calendarHref = cal.href;
                                     collected.push(e);
                                 });
                             } catch (parseErr) {

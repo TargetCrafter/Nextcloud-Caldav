@@ -21,7 +21,8 @@ file or with `kpackagetool6`.
   with a checkbox to mark them done directly from the widget, and subtasks
   (linked via `RELATED-TO`, e.g. from Nextcloud Tasks) shown indented under
   their parent
-- Quick-add for both events and tasks, right from the widget
+- Quick-add for both events and tasks, and edit or delete an existing one
+  (single, non-recurring events only), right from the widget
 - Each event/task renders as its own card with a hover highlight and a
   calendar-color accent bar, so items are easy to tell apart at a glance
 - Panel view shows the next event's countdown, today's event count, or just
@@ -163,11 +164,22 @@ To remove it: `kpackagetool6 --type Plasma/Applet --remove com.github.targetcraf
 - Discovery assumes the standard Nextcloud CalDAV layout
   (`/remote.php/dav/calendars/<username>/…`); servers with a different
   principal/calendar-home layout aren't auto-discovered.
-- Creating a new event or task is supported (via the "+" button); editing
-  or deleting an *existing* one isn't, beyond the done/not-done toggle.
-  Date/time entry for new events is plain `YYYY-MM-DD`/`HH:MM` text fields,
-  not a picker widget. Creating a task as a subtask of another isn't
-  exposed in the UI (only reading and indenting existing subtasks is).
+- Creating, editing, and deleting events/tasks is supported (hover an item
+  for the edit icon, or use the "+" button to create one). Date/time entry
+  is plain text fields following your system's date order, not a picker
+  widget. Creating a task as a subtask of another isn't exposed in the UI
+  (only reading and indenting existing subtasks is).
+- **Recurring events can't be edited or deleted from the widget** - only
+  single, non-recurring events get the edit icon. Which occurrence(s) an
+  edit or delete should apply to (this one, this and future, or the whole
+  series) is a real feature in its own right that a simple PUT/DELETE
+  can't safely guess at; use Nextcloud's own web UI or client for those.
+- Editing/deleting an event resolves its actual CalDAV resource by
+  guessing the `<calendar>/<uid>.ics` naming convention this widget (and
+  SabreDAV/Nextcloud's own clients) use when creating one - an event
+  created by a client that names resources differently will fail to
+  resolve, surfaced as a clear "server address not found"-style error
+  rather than silently doing nothing.
 - The month-calendar layout shows events only (no task due dates), and
   isn't available when a widget instance is set to Tasks only. Browsing to
   a different month issues its own fetch scoped to that month, separate

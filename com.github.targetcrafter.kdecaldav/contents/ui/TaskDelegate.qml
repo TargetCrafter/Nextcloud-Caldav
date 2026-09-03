@@ -8,6 +8,7 @@ Item {
 
     required property var taskData
     signal toggled()
+    signal editRequested()
 
     readonly property bool completed: taskData.status === "COMPLETED"
     readonly property int depth: taskData.depth || 0
@@ -84,6 +85,14 @@ Item {
             color: Kirigami.Theme.negativeTextColor
             Layout.preferredWidth: Kirigami.Units.iconSizes.small
             Layout.preferredHeight: Kirigami.Units.iconSizes.small
+        }
+
+        PlasmaComponents3.ToolButton {
+            visible: hover.hovered
+            icon.name: "document-edit"
+            onClicked: delegate.editRequested()
+            PlasmaComponents3.ToolTip.text: i18n("Edit…")
+            PlasmaComponents3.ToolTip.visible: hovered
         }
     }
 }

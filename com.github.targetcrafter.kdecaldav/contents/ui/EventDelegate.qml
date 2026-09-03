@@ -13,6 +13,8 @@ Item {
     // hours) stale otherwise.
     property date currentTime
 
+    signal editRequested()
+
     // An event that has already ended (or, for a point-in-time event with
     // no end, already started) earlier today.
     readonly property bool isPast: {
@@ -78,6 +80,18 @@ Item {
                 font.pointSize: Kirigami.Theme.smallFont.pointSize
                 text: delegate.eventData.location
             }
+        }
+
+        PlasmaComponents3.ToolButton {
+            // Recurring events aren't editable/deletable here - which
+            // occurrence(s) an edit should apply to is a real feature of
+            // its own, not something to guess at with a single-resource
+            // PUT/DELETE.
+            visible: hover.hovered && !delegate.eventData.isRecurring
+            icon.name: "document-edit"
+            onClicked: delegate.editRequested()
+            PlasmaComponents3.ToolTip.text: i18n("Edit…")
+            PlasmaComponents3.ToolTip.visible: hovered
         }
     }
 }

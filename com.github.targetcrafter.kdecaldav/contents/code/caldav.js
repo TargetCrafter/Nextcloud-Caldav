@@ -230,15 +230,49 @@ function parseTodoListing(xmlText) {
     return out;
 }
 
-// Writes back a full VTODO ICS body (as produced by ical.js's
-// patchTodoStatus) with an If-Match on the last known etag so a concurrent
-// edit elsewhere is refused rather than silently overwritten.
-function putTodo(serverUrl, username, password, todoHref, etag, icsText, callback) {
-    var url = resolveHref(serverUrl, todoHref);
+// Writes back a full ICS body (VEVENT or VTODO, as produced by ical.js's
+// patchTodoStatus/patchTodoFields/patchEventFields) to an existing
+// resource, with an If-Match on the last known etag so a concurrent edit
+// elsewhere is refused rather than silently overwritten.
+function updateResource(serverUrl, username, password, href, etag, icsText, callback) {
+    var url = resolveHref(serverUrl, href);
     var headers = { "Content-Type": "text/calendar; charset=utf-8" };
     if (etag) headers["If-Match"] = etag;
     sendRequest("PUT", url, username, password, headers, icsText, function (err) {
         callback(err);
+    });
+}
+
+// Deletes an existing calendar object resource, with an If-Match on the
+// last known etag so a concurrent edit elsewhere is refused instead of
+// deleting out from under it.
+function deleteResource(serverUrl, username, password, href, etag, callback) {
+    var url = resolveHref(serverUrl, href);
+    var headers = {};
+    if (etag) headers["If-Match"] = etag;
+    sendRequest("DELETE", url, username, password, headers, null, function (err) {
+        callback(err);
+    });
+}
+
+// Fetches a single event's own resource by UID, guessing the same
+// <calendarHref><uid>.ics naming convention createResource uses when
+// creating one. Needed before editing/deleting an event: fetchEvents()
+// above uses SabreDAV's ?export extension for display, which returns one
+// merged blob with no per-resource href or etag (see the file-level
+// comment) - there is no per-object identity to write back to until this
+// resolves the resource fresh. callback(error, { href, etag, icsText }).
+// A servers/clients that name event resources differently than
+// <uid>.ics will 404 here - surfaced as a plain "notfound" error rather
+// than guessed around further.
+function fetchEventResource(serverUrl, username, password, calendarHref, uid, callback) {
+    var href = calendarHref + (calendarHref.charAt(calendarHref.length - 1) === "/" ? "" : "/") + uid + ".ics";
+    var url = resolveHref(serverUrl, href);
+    sendRequest("GET", url, username, password, { "Accept": "text/calendar" }, null, function (err, xhr) {
+        if (err) { callback(err, null); return; }
+        var etag = null;
+        try { etag = xhr.getResponseHeader("ETag"); } catch (e) { /* no header support, fine without */ }
+        callback(null, { href: href, etag: etag, icsText: xhr.responseText });
     });
 }
 

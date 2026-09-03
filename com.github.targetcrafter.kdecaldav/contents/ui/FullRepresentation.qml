@@ -53,11 +53,41 @@ Item {
         return "";
     }
 
+    // Edit/delete panel state. editingItem holds the raw event/task object
+    // being edited (or null when closed); editSuccessToken is bumped by
+    // root once a save/delete actually completes (root can't call a
+    // function on this component directly, only react through bound
+    // properties - see main.qml's editSuccessToken comment), which is what
+    // actually closes the panel on success.
+    property string editError: ""
+    property int editSuccessToken: 0
+    property var editingItem: null
+    property bool editingIsTask: false
+    readonly property bool showEditBar: editingItem !== null
+
+    onEditSuccessTokenChanged: fullRep.editingItem = null
+
+    function openEditTask(task) {
+        fullRep.showAddBar = false;
+        fullRep.editingIsTask = true;
+        fullRep.editingItem = task;
+    }
+
+    function openEditEvent(event) {
+        fullRep.showAddBar = false;
+        fullRep.editingIsTask = false;
+        fullRep.editingItem = event;
+    }
+
     signal refreshRequested()
     signal toggleTask(var task)
     signal openConfigureRequested()
     signal createTaskRequested(string calendarHref, string summary, var due)
     signal createEventRequested(string calendarHref, string summary, var start, var end, bool allDay)
+    signal editTaskRequested(var task, string summary, var due)
+    signal editEventRequested(var event, string summary, var start, var end, bool allDay)
+    signal deleteTaskRequested(var task)
+    signal deleteEventRequested(var event)
     signal monthNavigate(int delta)
     signal monthJump(date month)
 
@@ -122,7 +152,10 @@ Item {
                 icon.name: "list-add"
                 checked: fullRep.showAddBar
                 checkable: true
-                onClicked: fullRep.showAddBar = !fullRep.showAddBar
+                onClicked: {
+                    fullRep.editingItem = null;
+                    fullRep.showAddBar = !fullRep.showAddBar;
+                }
                 PlasmaComponents3.ToolTip.text: i18n("Add event or task…")
                 PlasmaComponents3.ToolTip.visible: hovered
             }
@@ -155,6 +188,22 @@ Item {
         }
 
         Kirigami.Separator { Layout.fillWidth: true; visible: fullRep.showAddBar }
+
+        EditItemBar {
+            visible: fullRep.showEditBar
+            isTask: fullRep.editingIsTask
+            item: fullRep.editingItem
+            externalError: fullRep.editError
+            onSaveTask: fullRep.editTaskRequested(fullRep.editingItem, summary, due)
+            onSaveEvent: fullRep.editEventRequested(fullRep.editingItem, summary, start, end, allDay)
+            onRemove: {
+                if (fullRep.editingIsTask) fullRep.deleteTaskRequested(fullRep.editingItem);
+                else fullRep.deleteEventRequested(fullRep.editingItem);
+            }
+            onCancelled: fullRep.editingItem = null
+        }
+
+        Kirigami.Separator { Layout.fillWidth: true; visible: fullRep.showEditBar }
 
         PlasmaExtras.PlaceholderMessage {
             Layout.alignment: Qt.AlignCenter
@@ -288,6 +337,7 @@ Item {
         EventDelegate {
             eventData: parent.itemData.data
             currentTime: fullRep.currentTime
+            onEditRequested: fullRep.openEditEvent(parent.itemData.data)
         }
     }
 
@@ -299,6 +349,7 @@ Item {
         EventDelegate {
             eventData: parent.itemData
             currentTime: fullRep.currentTime
+            onEditRequested: fullRep.openEditEvent(parent.itemData)
         }
     }
 
@@ -307,6 +358,7 @@ Item {
         TaskDelegate {
             taskData: parent.itemData.data
             onToggled: fullRep.toggleTask(parent.itemData.data)
+            onEditRequested: fullRep.openEditTask(parent.itemData.data)
         }
     }
 
