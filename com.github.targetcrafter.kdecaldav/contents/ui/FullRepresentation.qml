@@ -33,7 +33,16 @@ Item {
                                        plasmoid.configuration.displayMode !== 2 /* TasksOnly */
     readonly property var selectedDayEvents: computeSelectedDayEvents()
 
-    onMonthCursorChanged: fullRep.selectedDate = new Date(fullRep.monthCursor)
+    // Only jump the selected day when navigating to a month that doesn't
+    // contain it (not unconditionally on every monthCursor change, which
+    // clobbered the "today" default back to the 1st as soon as monthCursor
+    // got its very first value from root at construction time).
+    onMonthCursorChanged: {
+        if (fullRep.selectedDate.getFullYear() !== fullRep.monthCursor.getFullYear() ||
+            fullRep.selectedDate.getMonth() !== fullRep.monthCursor.getMonth()) {
+            fullRep.selectedDate = new Date(fullRep.monthCursor);
+        }
+    }
 
     property bool showAddBar: false
 
@@ -50,6 +59,14 @@ Item {
     signal createTaskRequested(string calendarHref, string summary, var due)
     signal createEventRequested(string calendarHref, string summary, var start, var end, bool allDay)
     signal monthNavigate(int delta)
+
+    function headerTitle() {
+        var mode = plasmoid.configuration.displayMode;
+        if (mode === 2 /* TasksOnly */) return i18n("Tasks");
+        var isMonth = plasmoid.configuration.viewMode === 1 /* Month */;
+        if (mode === 1 /* EventsOnly */) return isMonth ? i18n("Calendar") : i18n("Agenda");
+        return isMonth ? i18n("Calendar + Tasks") : i18n("Agenda + Tasks");
+    }
 
     function computeSelectedDayEvents() {
         var list = fullRep.monthEvents.filter(function (e) {
@@ -80,7 +97,7 @@ Item {
 
             Kirigami.Heading {
                 level: 2
-                text: i18n("Agenda")
+                text: fullRep.headerTitle()
                 Layout.fillWidth: true
             }
 

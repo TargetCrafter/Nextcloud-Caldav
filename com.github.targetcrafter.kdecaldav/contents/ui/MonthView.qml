@@ -140,19 +140,26 @@ ColumnLayout {
         }
     }
 
+    // Rows only as far as the month's last day needs, rather than always
+    // padding out to a fixed 6 - most months only need 5 (some still need
+    // 6, when the month both starts late in its first week and runs a full
+    // 31/30 days), but none should get a trailing row made up entirely of
+    // next-month days.
     function buildWeeks() {
         var first = new Date(monthCursor.getFullYear(), monthCursor.getMonth(), 1);
+        var last = new Date(monthCursor.getFullYear(), monthCursor.getMonth() + 1, 0);
         var start = new Date(first);
         start.setDate(start.getDate() - start.getDay());
         var weeks = [];
         var day = new Date(start);
-        for (var w = 0; w < 6; w++) {
+        while (true) {
             var week = [];
             for (var d = 0; d < 7; d++) {
                 week.push(new Date(day));
                 day.setDate(day.getDate() + 1);
             }
             weeks.push(week);
+            if (day.getTime() > last.getTime()) break;
         }
         return weeks;
     }
