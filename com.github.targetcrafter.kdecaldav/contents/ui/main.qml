@@ -77,6 +77,7 @@ PlasmoidItem {
         onCreateTaskRequested: root.createTask(calendarHref, summary, due)
         onCreateEventRequested: root.createEvent(calendarHref, summary, start, end, allDay)
         onMonthNavigate: root.changeMonth(delta)
+        onMonthJump: root.jumpToMonth(month)
     }
 
     Timer {
@@ -131,7 +132,7 @@ PlasmoidItem {
     }
 
     Component.onCompleted: {
-        console.log("CalDAV Agenda: build 0.4.7 starting");
+        console.log("CalDAV Agenda: build 0.4.8 starting");
         refresh();
         if (plasmoid.configuration.viewMode === 1 /* Month */) refreshMonth(monthCursor);
     }
@@ -180,6 +181,15 @@ PlasmoidItem {
             agendaItems = [];
             return;
         }
+
+        // Keep the month-calendar view in sync with every refresh (the
+        // timer, the manual refresh button, and after creating/toggling an
+        // item all call refresh() already) - it has its own independent
+        // fetch since it covers a different date range, and previously
+        // only got refreshed by navigating the month view itself, so a
+        // newly created event never showed up there until you clicked away
+        // and back.
+        refreshMonth(monthCursor);
 
         isLoading = true;
         lastError = "";
@@ -460,6 +470,11 @@ PlasmoidItem {
 
     function changeMonth(delta) {
         monthCursor = delta === 0 ? monthCursor : DateUtils.addMonths(monthCursor, delta);
+        refreshMonth(monthCursor);
+    }
+
+    function jumpToMonth(monthDate) {
+        monthCursor = DateUtils.startOfMonth(monthDate);
         refreshMonth(monthCursor);
     }
 

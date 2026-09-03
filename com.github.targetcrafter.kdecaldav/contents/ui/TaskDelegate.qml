@@ -22,10 +22,10 @@ Item {
     Rectangle {
         anchors.fill: parent
         radius: Kirigami.Units.cornerRadius
-        // Tasks get a tinted background (as opposed to events' neutral one)
-        // so the two kinds of agenda item are distinguishable at a glance
-        // even before reading their content.
-        color: hover.hovered ? Kirigami.Theme.hoverColor : Kirigami.Theme.neutralBackgroundColor
+        // Matches EventDelegate's card background - the calendar-color
+        // accent bar below is what now tells tasks and events apart, the
+        // same way it already does between different calendars.
+        color: hover.hovered ? Kirigami.Theme.hoverColor : Kirigami.Theme.alternateBackgroundColor
         opacity: hover.hovered ? 1 : 0.35
     }
 
@@ -35,6 +35,13 @@ Item {
         anchors.margins: Kirigami.Units.mediumSpacing
         anchors.leftMargin: Kirigami.Units.mediumSpacing + delegate.depth * Kirigami.Units.gridUnit
         spacing: Kirigami.Units.smallSpacing
+
+        Rectangle {
+            Layout.preferredWidth: Kirigami.Units.smallSpacing * 0.6
+            Layout.fillHeight: true
+            radius: width / 2
+            color: delegate.taskData.calendarColor || Kirigami.Theme.highlightColor
+        }
 
         PlasmaComponents3.Label {
             visible: delegate.depth > 0

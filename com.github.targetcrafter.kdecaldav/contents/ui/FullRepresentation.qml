@@ -59,6 +59,16 @@ Item {
     signal createTaskRequested(string calendarHref, string summary, var due)
     signal createEventRequested(string calendarHref, string summary, var start, var end, bool allDay)
     signal monthNavigate(int delta)
+    signal monthJump(date month)
+
+    // Selects today's date and, if it's not in the month currently shown,
+    // asks root to jump straight there - a plain navigate(delta) can't
+    // express an arbitrary jump, only a relative one.
+    function goToToday() {
+        var today = new Date();
+        fullRep.selectedDate = today;
+        fullRep.monthJump(today);
+    }
 
     function headerTitle() {
         var mode = plasmoid.configuration.displayMode;
@@ -138,6 +148,7 @@ Item {
             visible: fullRep.showAddBar
             calendars: fullRep.availableCalendars
             lockedType: fullRep.addLockedType
+            defaultDate: fullRep.selectedDate
             externalError: fullRep.createError
             onCreateTask: fullRep.createTaskRequested(calendarHref, summary, due)
             onCreateEvent: fullRep.createEventRequested(calendarHref, summary, start, end, allDay)
@@ -202,6 +213,7 @@ Item {
                 currentTime: fullRep.currentTime
                 onNavigate: fullRep.monthNavigate(delta)
                 onDaySelected: fullRep.selectedDate = day
+                onTodayRequested: fullRep.goToToday()
             }
 
             Kirigami.Separator { Layout.fillWidth: true }

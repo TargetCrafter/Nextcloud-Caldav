@@ -22,9 +22,8 @@ file or with `kpackagetool6`.
   (linked via `RELATED-TO`, e.g. from Nextcloud Tasks) shown indented under
   their parent
 - Quick-add for both events and tasks, right from the widget
-- Each event/task renders as its own card with a hover highlight, and tasks
-  get a distinct tint from events so the two are easy to tell apart at a
-  glance
+- Each event/task renders as its own card with a hover highlight and a
+  calendar-color accent bar, so items are easy to tell apart at a glance
 - Panel view shows the next event's countdown, today's event count, or just
   an icon — your choice
 - Per-calendar color coding
@@ -32,7 +31,9 @@ file or with `kpackagetool6`.
 - Restrict a widget instance to events only, tasks only, or both combined —
   useful for placing separate calendar and to-do widgets side by side
 - Optional month-calendar layout (in place of the agenda list), with colored
-  dots marking days that have events; click a day to see what's on it
+  dots marking days that have events, a Today button, and click-to-inspect
+  days
+- New-item date fields follow your system's day/month order
 
 ## Multiple widgets: separate calendar and to-do lists
 

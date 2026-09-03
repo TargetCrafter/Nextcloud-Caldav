@@ -29,6 +29,41 @@ ColumnLayout {
     // field-validation errors below), bound in from outside.
     property string externalError: ""
 
+    // Date the new-item fields prefill with: the day selected in the
+    // month-calendar view, or today when there isn't one (see
+    // FullRepresentation.qml's selectedDate, which itself already defaults
+    // to today outside month view).
+    property date defaultDate: new Date()
+
+    // Day/month order taken from the system locale, so typed dates read the
+    // way this user expects (e.g. DD-MM-YYYY) rather than a hardcoded
+    // ISO-style YYYY-MM-DD. Always a 4-digit year with "-" separators
+    // regardless of locale, since the locale's own short-date pattern can
+    // use 2-digit years or different separators that a small hand-rolled
+    // parser can't reliably round-trip.
+    readonly property bool dayFirst: bar.detectDayFirst()
+    readonly property string dateHint: dayFirst ? "DD-MM-YYYY" : "MM-DD-YYYY"
+
+    function detectDayFirst() {
+        try {
+            var fmt = Qt.locale().dateFormat(Locale.ShortFormat).toLowerCase();
+            var di = fmt.indexOf("d");
+            var mi = fmt.indexOf("m");
+            if (di === -1 || mi === -1) return true;
+            return di < mi;
+        } catch (e) {
+            return true;
+        }
+    }
+
+    onVisibleChanged: {
+        if (bar.visible) {
+            var text = bar.formatDateField(bar.defaultDate);
+            dueField.text = text;
+            startDateField.text = text;
+        }
+    }
+
     signal createTask(string calendarHref, string summary, var due)
     signal createEvent(string calendarHref, string summary, var start, var end, bool allDay)
 
@@ -89,7 +124,7 @@ ColumnLayout {
         QQC2.TextField {
             id: dueField
             Layout.preferredWidth: Kirigami.Units.gridUnit * 6
-            placeholderText: i18n("YYYY-MM-DD (optional)")
+            placeholderText: bar.dateHint + i18n(" (optional)")
         }
     }
 
@@ -105,7 +140,7 @@ ColumnLayout {
         QQC2.TextField {
             id: startDateField
             Layout.preferredWidth: Kirigami.Units.gridUnit * 6
-            placeholderText: "YYYY-MM-DD"
+            placeholderText: bar.dateHint
         }
         QQC2.TextField {
             id: startTimeField
@@ -151,15 +186,20 @@ ColumnLayout {
 
     function pad(n) { return (n < 10 ? "0" : "") + n; }
 
-    function todayText() {
-        var d = new Date();
-        return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+    function formatDateField(d) {
+        var dd = pad(d.getDate());
+        var mm = pad(d.getMonth() + 1);
+        var yyyy = d.getFullYear();
+        return bar.dayFirst ? (dd + "-" + mm + "-" + yyyy) : (mm + "-" + dd + "-" + yyyy);
     }
 
     function parseDateField(text) {
-        var m = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        var m = text.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
         if (!m) return null;
-        var d = new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10));
+        var a = parseInt(m[1], 10), b = parseInt(m[2], 10), y = parseInt(m[3], 10);
+        var day = bar.dayFirst ? a : b;
+        var month = bar.dayFirst ? b : a;
+        var d = new Date(y, month - 1, day);
         return isNaN(d.getTime()) ? null : d;
     }
 
@@ -186,14 +226,14 @@ ColumnLayout {
             var dueText = dueField.text.trim();
             if (dueText !== "") {
                 due = parseDateField(dueText);
-                if (!due) { localError = i18n("Due date must be in YYYY-MM-DD form."); return; }
+                if (!due) { localError = i18n("Due date must be in %1 form.", bar.dateHint); return; }
             }
             createTask(cal.href, summary, due);
-            dueField.text = "";
+            dueField.text = bar.formatDateField(bar.defaultDate);
         } else {
-            var startDateText = startDateField.text.trim() || todayText();
+            var startDateText = startDateField.text.trim() || bar.formatDateField(bar.defaultDate);
             var startDate = parseDateField(startDateText);
-            if (!startDate) { localError = i18n("Start date must be in YYYY-MM-DD form."); return; }
+            if (!startDate) { localError = i18n("Start date must be in %1 form.", bar.dateHint); return; }
 
             var start, end;
             if (allDayCheck.checked) {
@@ -208,7 +248,7 @@ ColumnLayout {
                 end = new Date(start.getTime() + durationSpin.value * 3600000);
             }
             createEvent(cal.href, summary, start, end, allDayCheck.checked);
-            startDateField.text = "";
+            startDateField.text = bar.formatDateField(bar.defaultDate);
             startTimeField.text = "";
         }
         titleField.text = "";

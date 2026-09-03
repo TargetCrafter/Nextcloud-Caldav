@@ -19,6 +19,7 @@ ColumnLayout {
 
     signal navigate(int delta)
     signal daySelected(date day)
+    signal todayRequested()
 
     readonly property var weeks: buildWeeks()
 
@@ -45,6 +46,11 @@ ColumnLayout {
             visible: running
             implicitWidth: Kirigami.Units.iconSizes.small
             implicitHeight: implicitWidth
+        }
+
+        PlasmaComponents3.ToolButton {
+            text: i18n("Today")
+            onClicked: view.todayRequested()
         }
 
         PlasmaComponents3.ToolButton {
