@@ -77,6 +77,9 @@ Item {
             font.strikeout: delegate.completed
             font.pointSize: delegate.depth > 0 ? Kirigami.Theme.smallFont.pointSize : Kirigami.Theme.defaultFont.pointSize
             opacity: delegate.completed ? 0.6 : 1
+            // See EventDelegate.qml's summary Label for why this must be
+            // plain text: this renders a server-supplied task summary.
+            textFormat: Text.PlainText
             text: delegate.taskData.summary || i18n("(No title)")
         }
 

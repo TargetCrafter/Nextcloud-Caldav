@@ -57,6 +57,14 @@ function unescapeText(value) {
 function escapeText(value) {
     return String(value)
         .replace(/\\/g, "\\\\")
+        // Normalize all three line-ending forms (CRLF, bare CR, bare LF) to
+        // the same escaped-newline sequence - a bare \r left unescaped would
+        // otherwise pass through as a real carriage return in the ICS body,
+        // which some parsers treat as a line terminator in its own right,
+        // letting a value like a task description inject what reads as a
+        // new ICS property line.
+        .replace(/\r\n/g, "\\n")
+        .replace(/\r/g, "\\n")
         .replace(/\n/g, "\\n")
         .replace(/,/g, "\\,")
         .replace(/;/g, "\\;");

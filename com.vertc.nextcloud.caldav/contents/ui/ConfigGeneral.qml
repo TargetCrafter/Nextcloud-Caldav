@@ -38,6 +38,16 @@ Kirigami.FormLayout {
         }
     }
 
+    QQC2.Label {
+        Kirigami.FormData.label: " "
+        visible: /^http:\/\//i.test(serverUrlField.text.trim())
+        Layout.maximumWidth: Kirigami.Units.gridUnit * 20
+        wrapMode: Text.WordWrap
+        font.pointSize: Kirigami.Theme.smallFont.pointSize
+        color: Kirigami.Theme.neutralTextColor
+        text: i18n("This address uses unencrypted http://. Your username and app password will be sent in the clear unless this server is only reachable over a trusted network.")
+    }
+
     RowLayout {
         Kirigami.FormData.label: i18n("Account:")
         spacing: Kirigami.Units.smallSpacing
@@ -75,6 +85,9 @@ Kirigami.FormLayout {
         Kirigami.FormData.label: " "
         visible: page.loginState === "success"
         color: Kirigami.Theme.positiveTextColor
+        // usernameField.text here comes from the server's login-flow
+        // response (result.loginName), not local input.
+        textFormat: Text.PlainText
         text: i18n("Signed in as %1.", usernameField.text)
     }
 
@@ -174,6 +187,10 @@ Kirigami.FormLayout {
 
                 QQC2.Label {
                     Layout.fillWidth: true
+                    // See EventDelegate.qml's summary Label for why this
+                    // must be plain text: this renders a server-supplied
+                    // calendar display name discovered via PROPFIND.
+                    textFormat: Text.PlainText
                     text: modelData.displayName
                 }
 
@@ -201,6 +218,15 @@ Kirigami.FormLayout {
             if (err) {
                 page.loginState = "error";
                 page.loginError = page.describeLoginError(err);
+                return;
+            }
+            // data.login is server-supplied; only open it if it's actually
+            // an http(s) URL rather than handing some other URI scheme
+            // (which could trigger an arbitrary registered handler) to
+            // openUrlExternally sight unseen.
+            if (!/^https?:\/\//i.test(data.login)) {
+                page.loginState = "error";
+                page.loginError = page.describeLoginError("parse");
                 return;
             }
             page.loginPollToken = data.poll.token;

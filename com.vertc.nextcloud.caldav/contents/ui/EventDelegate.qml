@@ -69,6 +69,13 @@ Item {
             PlasmaComponents3.Label {
                 Layout.fillWidth: true
                 elide: Text.ElideRight
+                // Plain, not the Label default of AutoText: this renders a
+                // server-supplied event summary, and Qt's rich-text
+                // auto-detection would otherwise turn HTML-looking content
+                // in it into live links/images (e.g. a tracking-pixel-style
+                // <img> fetched just by displaying the widget) from a
+                // malicious or compromised shared calendar.
+                textFormat: Text.PlainText
                 text: delegate.eventData.summary || i18n("(No title)")
             }
 
@@ -78,6 +85,7 @@ Item {
                 elide: Text.ElideRight
                 opacity: 0.7
                 font.pointSize: Kirigami.Theme.smallFont.pointSize
+                textFormat: Text.PlainText
                 text: delegate.eventData.location
             }
         }

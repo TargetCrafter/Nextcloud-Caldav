@@ -50,6 +50,21 @@ function resolveHref(serverUrl, href) {
     return originOf(serverUrl) + href;
 }
 
+// Builds the <calendarHref><uid>.ics href both fetchEventResource and
+// createResource use, with the uid percent-encoded as a single path
+// segment. uid isn't always ours: fetchEventResource's comes straight from
+// a parsed VEVENT's UID property, which for a shared/subscribed calendar is
+// server- (or other calendar owner-) supplied data, not something this app
+// generated - so it must not be trusted to already be a safe path segment.
+// Without encoding, a UID containing "/" (e.g. "../../somewhere-else")
+// would let a malicious calendar entry redirect the GET/PUT/DELETE this
+// href is used for to an unintended resource elsewhere under the same
+// CalDAV origin instead of 404ing.
+function eventResourceHref(calendarHref, uid) {
+    return calendarHref + (calendarHref.charAt(calendarHref.length - 1) === "/" ? "" : "/") +
+           encodeURIComponent(uid) + ".ics";
+}
+
 function calendarHomeUrl(serverUrl, username) {
     return normalizeServerUrl(serverUrl) + "/remote.php/dav/calendars/" + encodeURIComponent(username) + "/";
 }
@@ -266,7 +281,7 @@ function deleteResource(serverUrl, username, password, href, etag, callback) {
 // <uid>.ics will 404 here - surfaced as a plain "notfound" error rather
 // than guessed around further.
 function fetchEventResource(serverUrl, username, password, calendarHref, uid, callback) {
-    var href = calendarHref + (calendarHref.charAt(calendarHref.length - 1) === "/" ? "" : "/") + uid + ".ics";
+    var href = eventResourceHref(calendarHref, uid);
     var url = resolveHref(serverUrl, href);
     sendRequest("GET", url, username, password, { "Accept": "text/calendar" }, null, function (err, xhr) {
         if (err) { callback(err, null); return; }
@@ -281,7 +296,7 @@ function fetchEventResource(serverUrl, username, password, calendarHref, uid, ca
 // that name already exists, rather than silently overwriting it - shouldn't
 // ever trigger given uid is a fresh generateUid(), but costs nothing.
 function createResource(serverUrl, username, password, calendarHref, uid, icsText, callback) {
-    var href = calendarHref + (calendarHref.charAt(calendarHref.length - 1) === "/" ? "" : "/") + uid + ".ics";
+    var href = eventResourceHref(calendarHref, uid);
     var url = resolveHref(serverUrl, href);
     var headers = { "Content-Type": "text/calendar; charset=utf-8", "If-None-Match": "*" };
     sendRequest("PUT", url, username, password, headers, icsText, function (err) {
