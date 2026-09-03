@@ -50,7 +50,17 @@ PlasmoidItem {
                                       plasmoid.configuration.username.length > 0 &&
                                       plasmoid.configuration.appPassword.length > 0
 
-    Plasmoid.icon: "view-calendar"
+    // metadata.json's Icon field only supports a system icon-theme name -
+    // Plasma's widget-explorer list resolves it via QIcon::fromTheme, not
+    // a bundled file, so the "Add Widgets" card can't show this logo that
+    // way. The running widget's own icon (panel/system tray/compact
+    // representation) is set here instead via plasmoid.file(), which
+    // resolves a path relative to contents/ within this package - the
+    // documented mechanism for a plasmoid's own bundled icon. Falls back
+    // to a system icon if the bundled file can't be found for some reason
+    // (plasmoid.file returns "" in that case, which Plasmoid.icon would
+    // otherwise render as no icon at all).
+    Plasmoid.icon: plasmoid.file("", "icon.svg") || "view-calendar"
     Plasmoid.title: i18n("Nextcloud Caldav")
     toolTipMainText: nextEvent ? nextEvent.summary : i18n("Nextcloud Caldav")
     toolTipSubText: lastError !== "" ? errorSummary(lastError) : toolTipSummary()
@@ -143,7 +153,7 @@ PlasmoidItem {
     }
 
     Component.onCompleted: {
-        console.log("Nextcloud Caldav: build 0.5.7 starting");
+        console.log("Nextcloud Caldav: build 0.5.8 starting");
         refresh();
         if (plasmoid.configuration.viewMode === 1 /* Month */) refreshMonth(monthCursor);
     }
