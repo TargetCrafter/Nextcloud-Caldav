@@ -153,7 +153,7 @@ PlasmoidItem {
     }
 
     Component.onCompleted: {
-        console.log("Nextcloud Caldav: build 0.5.10 starting");
+        console.log("Nextcloud Caldav: build 0.5.11 starting");
         refresh();
         if (plasmoid.configuration.viewMode === 1 /* Month */) refreshMonth(monthCursor);
     }
@@ -340,10 +340,12 @@ PlasmoidItem {
     // Re-orders an already-sorted list of tasks so a subtask (parentUid
     // pointing at another task's uid) immediately follows its parent,
     // recursively, and stamps a `depth` (0 = top-level) used for visual
-    // indentation. A subtask whose parent isn't in this same list (e.g. it
-    // fell into a different day-bucket, or the parent is filtered out) is
-    // just treated as top-level here - there's no sensible bucket to move
-    // it into.
+    // indentation. finishRefresh's bucketing (see groupRootOf) always
+    // places a subtask in the same bucket as its parent, so the only way
+    // the parent can be missing from this same list is if it was filtered
+    // out entirely (e.g. completed and hidden) - that subtask is just
+    // treated as top-level here, there's no sensible parent to attach it
+    // to.
     function orderTasksWithHierarchy(tasks) {
         var byUid = {};
         tasks.forEach(function (t) { if (t.uid) byUid[t.uid] = t; });
@@ -357,6 +359,17 @@ PlasmoidItem {
                 roots.push(t);
             }
         });
+        // Subtasks are grouped under their parent regardless of their own
+        // due date (see groupRootOf in finishRefresh), so it's this sort -
+        // not bucket placement - that puts a parent's subtasks in due-date
+        // order underneath it. Undated subtasks sort after dated ones.
+        function byDue(a, b) {
+            if (!a.due && !b.due) return 0;
+            if (!a.due) return 1;
+            if (!b.due) return -1;
+            return a.due.getTime() - b.due.getTime();
+        }
+        Object.keys(childrenOf).forEach(function (uid) { childrenOf[uid].sort(byDue); });
         var out = [];
         function visit(t, depth) {
             t.depth = depth;
@@ -365,6 +378,24 @@ PlasmoidItem {
         }
         roots.forEach(function (t) { visit(t, 0); });
         return out;
+    }
+
+    // The task whose own due date/completion status decides which section
+    // (overdue / a specific day / no due date) an entire subtask subtree
+    // belongs in - the top-most ancestor still present in `todos`, so a
+    // subtask's own (possibly quite different) due date never buckets it
+    // separately from its parent. Falls back to the task itself once the
+    // chain runs out (parent filtered out, on a different calendar, a
+    // cycle, ...) - the same "just treat it as a root" fallback
+    // orderTasksWithHierarchy above uses for the same reason.
+    function groupRootOf(todoByUid, t) {
+        var seen = {};
+        var cur = t;
+        while (cur.parentUid && todoByUid[cur.parentUid] && !seen[cur.uid]) {
+            seen[cur.uid] = true;
+            cur = todoByUid[cur.parentUid];
+        }
+        return cur;
     }
 
     function sortEvents(a, b) {
@@ -382,13 +413,25 @@ PlasmoidItem {
         var showTasks = wantsTasks();
         todos = showTasks ? todos.filter(function (t) { return showCompleted || t.status !== "COMPLETED"; }) : [];
 
-        var overdue = todos.filter(function (t) { return t.due && t.status !== "COMPLETED" && DateUtils.isOverdue(t.due, now); });
-        var noDue = todos.filter(function (t) { return !t.due; });
+        // Bucketed by the group root's own due date/status (see
+        // groupRootOf), not each task's own - otherwise a subtask due on a
+        // different day (or with no due date at all) than its parent ends
+        // up in a different section, displayed as if it were its own
+        // top-level task instead of nested under its parent.
+        var todoByUid = {};
+        todos.forEach(function (t) { if (t.uid) todoByUid[t.uid] = t; });
+
+        var overdue = todos.filter(function (t) {
+            var g = groupRootOf(todoByUid, t);
+            return g.due && g.status !== "COMPLETED" && DateUtils.isOverdue(g.due, now);
+        });
+        var noDue = todos.filter(function (t) { return !groupRootOf(todoByUid, t).due; });
         var dueByDay = {};
         todos.forEach(function (t) {
-            if (!t.due) return;
-            if (t.status !== "COMPLETED" && DateUtils.isOverdue(t.due, now)) return;
-            var key = DateUtils.dayKey(t.due);
+            var g = groupRootOf(todoByUid, t);
+            if (!g.due) return;
+            if (g.status !== "COMPLETED" && DateUtils.isOverdue(g.due, now)) return;
+            var key = DateUtils.dayKey(g.due);
             (dueByDay[key] = dueByDay[key] || []).push(t);
         });
 
@@ -401,7 +444,13 @@ PlasmoidItem {
 
         var out = [];
         if (overdue.length > 0) {
-            overdue.sort(function (a, b) { return a.due.getTime() - b.due.getTime(); });
+            // Sorted by the group root's due date, not each task's own -
+            // an overdue subtask with no due date of its own (grouped in
+            // here solely because its parent is overdue) has no a.due to
+            // sort by otherwise.
+            overdue.sort(function (a, b) {
+                return groupRootOf(todoByUid, a).due.getTime() - groupRootOf(todoByUid, b).due.getTime();
+            });
             out.push({ type: "sectionHeader", label: "overdue", count: overdue.length });
             orderTasksWithHierarchy(overdue).forEach(function (t) { out.push({ type: "task", data: t }); });
         }
