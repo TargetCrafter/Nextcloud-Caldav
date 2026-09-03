@@ -142,10 +142,11 @@ QQC2.Popup {
                 }
             }
 
-            QQC2.Button {
-                text: i18n("Close")
-                flat: true
+            PlasmaComponents3.ToolButton {
+                icon.name: "window-close"
                 onClicked: popup.close()
+                PlasmaComponents3.ToolTip.text: i18n("Close")
+                PlasmaComponents3.ToolTip.visible: hovered
             }
         }
 

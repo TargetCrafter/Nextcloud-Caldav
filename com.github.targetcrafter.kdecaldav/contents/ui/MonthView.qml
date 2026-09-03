@@ -104,7 +104,12 @@ ColumnLayout {
                     Layout.fillWidth: true
                     Layout.preferredHeight: Kirigami.Units.gridUnit * 2.6
                     radius: Kirigami.Units.cornerRadius
-                    color: isSelected ? Kirigami.Theme.highlightColor : (isToday ? Kirigami.Theme.hoverColor : "transparent")
+                    // Selected = filled, today = outlined - independent of
+                    // each other, so a selected today gets both at once
+                    // rather than one replacing the other.
+                    color: isSelected ? Kirigami.Theme.highlightColor : "transparent"
+                    border.width: isToday ? 2 : 0
+                    border.color: Kirigami.Theme.highlightColor
 
                     ColumnLayout {
                         anchors.fill: parent
