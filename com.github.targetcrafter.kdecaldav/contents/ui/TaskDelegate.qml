@@ -30,19 +30,31 @@ Item {
         opacity: hover.hovered ? 1 : 0.35
     }
 
+    // Kept outside the indented RowLayout below and anchored at a fixed
+    // position, rather than as the row's first child - a subtask's deeper
+    // anchors.leftMargin would otherwise have shifted its own accent bar
+    // along with the rest of its content, leaving every task's bar at a
+    // different x instead of all lined up in a column.
+    Rectangle {
+        id: accentBar
+        anchors.left: parent.left
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        anchors.leftMargin: Kirigami.Units.mediumSpacing
+        anchors.topMargin: Kirigami.Units.mediumSpacing
+        anchors.bottomMargin: Kirigami.Units.mediumSpacing
+        width: Kirigami.Units.smallSpacing * 0.6
+        radius: width / 2
+        color: delegate.taskData.calendarColor || Kirigami.Theme.highlightColor
+    }
+
     RowLayout {
         id: row
         anchors.fill: parent
         anchors.margins: Kirigami.Units.mediumSpacing
-        anchors.leftMargin: Kirigami.Units.mediumSpacing + delegate.depth * Kirigami.Units.gridUnit
+        anchors.leftMargin: Kirigami.Units.mediumSpacing + accentBar.width + Kirigami.Units.smallSpacing +
+                             delegate.depth * Kirigami.Units.gridUnit
         spacing: Kirigami.Units.smallSpacing
-
-        Rectangle {
-            Layout.preferredWidth: Kirigami.Units.smallSpacing * 0.6
-            Layout.fillHeight: true
-            radius: width / 2
-            color: delegate.taskData.calendarColor || Kirigami.Theme.highlightColor
-        }
 
         PlasmaComponents3.Label {
             visible: delegate.depth > 0
