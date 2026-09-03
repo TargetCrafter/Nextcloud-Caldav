@@ -46,6 +46,17 @@ PlasmoidItem {
     property date monthCursor: DateUtils.startOfMonth(new Date())
     property int monthRequestToken: 0
 
+    // Same stale-response guard as monthRequestToken above, for refresh()
+    // itself: several plasmoid.configuration properties each fire their own
+    // change signal independently (e.g. switching which calendars are
+    // enabled un-checks one and checks another as two separate writes), so
+    // a burst of config changes - or just a manual refresh landing while
+    // the refreshTimer's own tick is still in flight - starts multiple
+    // overlapping refresh() calls, each re-fetching every enabled calendar.
+    // Without this, whichever happens to finish last "wins" and can
+    // overwrite newer results with stale ones.
+    property int refreshRequestToken: 0
+
     property bool accountConfigured: plasmoid.configuration.serverUrl.length > 0 &&
                                       plasmoid.configuration.username.length > 0 &&
                                       plasmoid.configuration.appPassword.length > 0
@@ -134,16 +145,31 @@ PlasmoidItem {
         }
     }
 
+    // Coalesces a burst of config-property changes into a single refresh().
+    // Several of the Connections handlers below can fire independently
+    // within the same user action - e.g. switching which task list is
+    // enabled un-checks one calendar and checks another as two separate
+    // enabledCalendarUrls writes - and each used to call root.refresh()
+    // immediately, starting overlapping fetches of every enabled calendar
+    // (refreshRequestToken above already guards which one's results win,
+    // but this avoids firing the redundant requests in the first place).
+    Timer {
+        id: refreshDebounce
+        interval: 150
+        repeat: false
+        onTriggered: root.refresh()
+    }
+
     Connections {
         target: plasmoid.configuration
-        function onServerUrlChanged() { root.refresh() }
-        function onUsernameChanged() { root.refresh() }
-        function onAppPasswordChanged() { root.refresh() }
-        function onEnabledCalendarUrlsChanged() { root.refresh() }
-        function onDaysAheadChanged() { root.refresh() }
-        function onShowTasksChanged() { root.refresh() }
-        function onShowCompletedTasksChanged() { root.refresh() }
-        function onDisplayModeChanged() { root.refresh() }
+        function onServerUrlChanged() { refreshDebounce.restart() }
+        function onUsernameChanged() { refreshDebounce.restart() }
+        function onAppPasswordChanged() { refreshDebounce.restart() }
+        function onEnabledCalendarUrlsChanged() { refreshDebounce.restart() }
+        function onDaysAheadChanged() { refreshDebounce.restart() }
+        function onShowTasksChanged() { refreshDebounce.restart() }
+        function onShowCompletedTasksChanged() { refreshDebounce.restart() }
+        function onDisplayModeChanged() { refreshDebounce.restart() }
         function onViewModeChanged() {
             if (plasmoid.configuration.viewMode === 1 /* Month */ &&
                 root.monthEvents.length === 0 && !root.monthLoading) {
@@ -153,7 +179,7 @@ PlasmoidItem {
     }
 
     Component.onCompleted: {
-        console.log("Nextcloud Caldav: build 0.5.11 starting");
+        console.log("Nextcloud Caldav: build 0.5.12 starting");
         refresh();
         if (plasmoid.configuration.viewMode === 1 /* Month */) refreshMonth(monthCursor);
     }
@@ -216,6 +242,10 @@ PlasmoidItem {
         lastError = "";
         loadWatchdog.restart();
 
+        // See refreshRequestToken's declaration: only the most recently
+        // started refresh() is allowed to apply its results.
+        var token = ++refreshRequestToken;
+
         var serverUrl = plasmoid.configuration.serverUrl;
         var username = plasmoid.configuration.username;
         var password = plasmoid.configuration.appPassword;
@@ -231,7 +261,7 @@ PlasmoidItem {
 
         function checkDone() {
             pending--;
-            if (pending <= 0) {
+            if (pending <= 0 && token === refreshRequestToken) {
                 loadWatchdog.stop();
                 finishRefresh(collectedEvents, collectedTodos, firstError);
             }
