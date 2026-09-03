@@ -13,11 +13,10 @@
         "FormFactors": [
             "desktop"
         ],
-        "Icon": "view-calendar",
         "Id": "com.vertc.nextcloud.caldav",
         "License": "GPL-3.0-or-later",
         "Name": "Nextcloud Caldav",
-        "Version": "0.5.8",
+        "Version": "0.5.9",
         "Website": "https://github.com/TargetCrafter/KDE-Caldav"
     },
     "X-Plasma-API-Minimum-Version": "6.0"
