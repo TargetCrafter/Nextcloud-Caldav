@@ -196,38 +196,35 @@ Item {
                 text: Qt.formatDate(fullRep.selectedDate, "dddd · d MMMM")
             }
 
-            PlasmaComponents3.Label {
-                Layout.fillWidth: true
-                Layout.margins: Kirigami.Units.smallSpacing
-                Layout.topMargin: Kirigami.Units.gridUnit
-                horizontalAlignment: Text.AlignHCenter
-                visible: fullRep.selectedDayEvents.length === 0
-                opacity: 0.6
-                text: i18n("No events this day.")
-            }
-
             PlasmaComponents3.ScrollView {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                visible: fullRep.selectedDayEvents.length > 0
                 clip: true
 
-                // Same ScrollView+ListView+width-bound-delegate shape as the
-                // agenda list above: a plain ColumnLayout/Repeater here
-                // previously left the panel with no propagated width once
-                // wrapped in ScrollView's auto-Flickable, collapsing every
-                // EventDelegate to zero size - i.e. visibly empty even
-                // though selectedDayEvents had entries.
+                // Kept always mounted/visible (rather than toggled by
+                // selectedDayEvents.length) and using the exact same
+                // Loader+Component delegate shape as the agenda list's
+                // eventComponent above - the previous attempt set width
+                // directly on EventDelegate and toggled the ScrollView's
+                // own visibility right when a day was selected, and still
+                // rendered empty.
                 ListView {
                     id: dayEventsList
                     model: fullRep.selectedDayEvents
                     spacing: Kirigami.Units.smallSpacing
                     boundsBehavior: Flickable.StopAtBounds
 
-                    delegate: EventDelegate {
+                    delegate: Loader {
                         width: dayEventsList.width
-                        eventData: modelData
-                        currentTime: fullRep.currentTime
+                        sourceComponent: dayEventComponent
+                        property var itemData: modelData
+                    }
+
+                    PlasmaComponents3.Label {
+                        anchors.centerIn: parent
+                        visible: dayEventsList.count === 0
+                        opacity: 0.6
+                        text: i18n("No events this day.")
                     }
                 }
             }
@@ -261,6 +258,17 @@ Item {
         id: eventComponent
         EventDelegate {
             eventData: parent.itemData.data
+            currentTime: fullRep.currentTime
+        }
+    }
+
+    // Same shape as eventComponent above, but for the month view's
+    // day-detail panel, whose model is plain event objects rather than
+    // agendaItems' {type, data} wrapper.
+    Component {
+        id: dayEventComponent
+        EventDelegate {
+            eventData: parent.itemData
             currentTime: fullRep.currentTime
         }
     }
