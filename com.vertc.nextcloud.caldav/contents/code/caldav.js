@@ -310,6 +310,13 @@ function startLoginFlow(serverUrl, callback) {
     xhr.open("POST", url, true);
     xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
     xhr.setRequestHeader("Accept", "application/json");
+    // Nextcloud's Login Flow v2 consent screen ("grant X access to your
+    // account") shows the User-Agent of the request that started the
+    // flow. Qt's QML XMLHttpRequest sends a bare "Mozilla/5.0" when this
+    // isn't set explicitly, which is what a user actually sees on that
+    // screen otherwise - not particularly reassuring for a security
+    // prompt.
+    xhr.setRequestHeader("User-Agent", "Nextcloud Caldav (Plasma widget)");
     xhr.onreadystatechange = function () {
         if (xhr.readyState !== XMLHttpRequest.DONE) return;
         if (xhr.status !== 200) { callback(describeHttpError(xhr.status), null); return; }
