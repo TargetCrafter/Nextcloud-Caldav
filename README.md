@@ -21,8 +21,9 @@ file or with `kpackagetool6`.
   with a checkbox to mark them done directly from the widget, and subtasks
   (linked via `RELATED-TO`, e.g. from Nextcloud Tasks) shown indented under
   their parent
-- Quick-add for both events and tasks, and edit or delete an existing one
-  (single, non-recurring events only), right from the widget
+- A popup form for adding, editing, or deleting events and tasks (single,
+  non-recurring events only for editing/deleting), with title, calendar,
+  due/start date+time, description, and location fields
 - Each event/task renders as its own card with a hover highlight and a
   calendar-color accent bar, so items are easy to tell apart at a glance
 - Panel view shows the next event's countdown, today's event count, or just
@@ -164,11 +165,13 @@ To remove it: `kpackagetool6 --type Plasma/Applet --remove com.github.targetcraf
 - Discovery assumes the standard Nextcloud CalDAV layout
   (`/remote.php/dav/calendars/<username>/…`); servers with a different
   principal/calendar-home layout aren't auto-discovered.
-- Creating, editing, and deleting events/tasks is supported (hover an item
-  for the edit icon, or use the "+" button to create one). Date/time entry
-  is plain text fields following your system's date order, not a picker
-  widget. Creating a task as a subtask of another isn't exposed in the UI
-  (only reading and indenting existing subtasks is).
+- Creating, editing, and deleting events/tasks is supported via a popup
+  form (hover an item for the edit icon, or use the "+" button to create
+  one), with title, calendar, due/start date+time, description, and
+  location fields. Date/time entry is plain text fields following your
+  system's date order, not a picker widget. Creating a task as a subtask
+  of another isn't exposed in the UI (only reading and indenting existing
+  subtasks is).
 - **Recurring events can't be edited or deleted from the widget** - only
   single, non-recurring events get the edit icon. Which occurrence(s) an
   edit or delete should apply to (this one, this and future, or the whole

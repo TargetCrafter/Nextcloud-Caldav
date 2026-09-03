@@ -56,27 +56,16 @@ Item {
             Layout.alignment: Qt.AlignTop
         }
 
-        ColumnLayout {
+        PlasmaComponents3.Label {
+            // The calendar-color accent bar above already identifies which
+            // calendar this is, the same way it does for events - a
+            // separate calendar-name line was redundant.
             Layout.fillWidth: true
-            spacing: 0
-
-            PlasmaComponents3.Label {
-                Layout.fillWidth: true
-                elide: Text.ElideRight
-                font.strikeout: delegate.completed
-                font.pointSize: delegate.depth > 0 ? Kirigami.Theme.smallFont.pointSize : Kirigami.Theme.defaultFont.pointSize
-                opacity: delegate.completed ? 0.6 : 1
-                text: delegate.taskData.summary || i18n("(No title)")
-            }
-
-            PlasmaComponents3.Label {
-                Layout.fillWidth: true
-                visible: text !== ""
-                elide: Text.ElideRight
-                opacity: 0.7
-                font.pointSize: Kirigami.Theme.smallFont.pointSize
-                text: delegate.taskData.calendarName || ""
-            }
+            elide: Text.ElideRight
+            font.strikeout: delegate.completed
+            font.pointSize: delegate.depth > 0 ? Kirigami.Theme.smallFont.pointSize : Kirigami.Theme.defaultFont.pointSize
+            opacity: delegate.completed ? 0.6 : 1
+            text: delegate.taskData.summary || i18n("(No title)")
         }
 
         Kirigami.Icon {

@@ -197,6 +197,7 @@ function buildTodo(map, href, etag) {
         uid: textValue(map, "UID"),
         summary: textValue(map, "SUMMARY"),
         description: textValue(map, "DESCRIPTION"),
+        location: textValue(map, "LOCATION"),
         status: textValue(map, "STATUS") || "NEEDS-ACTION",
         due: due ? due.date : null,
         dueAllDay: due ? due.allDay : false,
@@ -404,37 +405,44 @@ function patchTodoStatus(todo, completed) {
            out.join("\n") + "\nEND:VTODO\nEND:VCALENDAR\n";
 }
 
-// Rewrites SUMMARY/DUE on an existing task's raw property lines, the same
-// patch-in-place approach as patchTodoStatus above, so STATUS, PRIORITY,
-// RELATED-TO and anything else already on the task survive an edit
-// untouched instead of being dropped by rebuilding the object from
-// scratch. `fields.due` is an optional Date; passing none removes it.
+// Rewrites SUMMARY/DUE/DESCRIPTION/LOCATION on an existing task's raw
+// property lines, the same patch-in-place approach as patchTodoStatus
+// above, so STATUS, PRIORITY, RELATED-TO and anything else already on the
+// task survive an edit untouched instead of being dropped by rebuilding
+// the object from scratch. `fields.due` is an optional Date; passing none
+// removes it. `fields.description`/`fields.location` are optional strings;
+// an empty string removes the property.
 function patchTodoFields(todo, fields) {
     var lines = (todo.rawLines || []).slice();
     var out = [];
     for (var i = 0; i < lines.length; i++) {
         var prop = parseLine(lines[i]);
-        if (prop && (prop.name === "SUMMARY" || prop.name === "DUE")) continue;
+        if (prop && (prop.name === "SUMMARY" || prop.name === "DUE" || prop.name === "DESCRIPTION" || prop.name === "LOCATION")) continue;
         out.push(lines[i]);
     }
     out.push("SUMMARY:" + escapeText(fields.summary));
     if (fields.due) out.push("DUE;VALUE=DATE:" + formatDateStamp(fields.due));
+    if (fields.description) out.push("DESCRIPTION:" + escapeText(fields.description));
+    if (fields.location) out.push("LOCATION:" + escapeText(fields.location));
     return "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//KDE-Caldav//CalDAV Agenda//EN\nBEGIN:VTODO\n" +
            out.join("\n") + "\nEND:VTODO\nEND:VCALENDAR\n";
 }
 
-// Rewrites SUMMARY/DTSTART/DTEND (and drops any DURATION in favor of an
-// explicit DTEND) in a single-VEVENT ICS blob just fetched fresh via
-// CalDAV.fetchEventResource, patching those specific lines rather than
-// rebuilding the object - so LOCATION, DESCRIPTION, RRULE and anything
-// else this app doesn't otherwise round-trip survive an edit untouched.
+// Rewrites SUMMARY/DTSTART/DTEND/DESCRIPTION/LOCATION (and drops any
+// DURATION in favor of an explicit DTEND) in a single-VEVENT ICS blob just
+// fetched fresh via CalDAV.fetchEventResource, patching those specific
+// lines rather than rebuilding the object - so RRULE and anything else
+// this app doesn't otherwise round-trip survives an edit untouched.
+// `fields.description`/`fields.location` are optional strings; an empty
+// string removes the property.
 function patchEventFields(icsText, fields) {
     var lines = unfold(icsText).split("\n").map(function (l) { return l.replace(/\s+$/, ""); }).filter(function (l) { return l.length > 0; });
     var block = (splitComponents(lines, "VEVENT")[0] || []).slice();
     var out = [];
     for (var i = 0; i < block.length; i++) {
         var prop = parseLine(block[i]);
-        if (prop && (prop.name === "SUMMARY" || prop.name === "DTSTART" || prop.name === "DTEND" || prop.name === "DURATION")) continue;
+        if (prop && (prop.name === "SUMMARY" || prop.name === "DTSTART" || prop.name === "DTEND" || prop.name === "DURATION" ||
+                     prop.name === "DESCRIPTION" || prop.name === "LOCATION")) continue;
         out.push(block[i]);
     }
     out.push("SUMMARY:" + escapeText(fields.summary));
@@ -445,6 +453,8 @@ function patchEventFields(icsText, fields) {
         out.push("DTSTART:" + formatLocalDateTimeStamp(fields.start));
         out.push("DTEND:" + formatLocalDateTimeStamp(fields.end));
     }
+    if (fields.description) out.push("DESCRIPTION:" + escapeText(fields.description));
+    if (fields.location) out.push("LOCATION:" + escapeText(fields.location));
     return "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//KDE-Caldav//CalDAV Agenda//EN\nBEGIN:VEVENT\n" +
            out.join("\n") + "\nEND:VEVENT\nEND:VCALENDAR\n";
 }
@@ -475,6 +485,8 @@ function buildVTodoIcs(opts) {
         "PERCENT-COMPLETE:0"
     ];
     if (opts.due) lines.push("DUE;VALUE=DATE:" + formatDateStamp(opts.due));
+    if (opts.description) lines.push("DESCRIPTION:" + escapeText(opts.description));
+    if (opts.location) lines.push("LOCATION:" + escapeText(opts.location));
     if (opts.parentUid) lines.push("RELATED-TO:" + opts.parentUid);
     lines.push("END:VTODO", "END:VCALENDAR", "");
     return lines.join("\n");
@@ -502,6 +514,7 @@ function buildVEventIcs(opts) {
         lines.push("DTSTART:" + formatLocalDateTimeStamp(opts.start));
         lines.push("DTEND:" + formatLocalDateTimeStamp(opts.end));
     }
+    if (opts.description) lines.push("DESCRIPTION:" + escapeText(opts.description));
     if (opts.location) lines.push("LOCATION:" + escapeText(opts.location));
     lines.push("END:VEVENT", "END:VCALENDAR", "");
     return lines.join("\n");

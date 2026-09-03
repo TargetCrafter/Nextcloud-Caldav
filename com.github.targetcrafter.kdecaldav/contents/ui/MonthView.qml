@@ -121,6 +121,12 @@ ColumnLayout {
 
                         RowLayout {
                             Layout.alignment: Qt.AlignHCenter
+                            // Reserved unconditionally, dots or not - a
+                            // height that only appeared when there were
+                            // dots pushed the day number itself up/down
+                            // between cells that had events and cells that
+                            // didn't, in the same row.
+                            Layout.preferredHeight: Kirigami.Units.smallSpacing * 1.6
                             spacing: Kirigami.Units.smallSpacing / 2
 
                             Repeater {
