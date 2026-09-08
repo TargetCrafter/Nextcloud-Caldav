@@ -37,6 +37,15 @@
       <default></default>
     </entry>
   </group>
+  <group name="TaskListState">
+    <!-- UIDs of parent tasks whose subtasks are currently folded away.
+         Pruned on every refresh to just the UIDs of tasks that still exist
+         and still have subtasks - see groupRootOf/pruneCollapsedTaskUids in
+         main.qml - so this doesn't grow to list every task ever collapsed. -->
+    <entry name="collapsedTaskUids" type="StringList">
+      <default></default>
+    </entry>
+  </group>
   <group name="General">
     <entry name="displayMode" type="Enum">
       <label>What to show</label>

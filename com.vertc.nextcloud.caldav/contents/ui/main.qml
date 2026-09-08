@@ -46,6 +46,15 @@ PlasmoidItem {
     property date monthCursor: DateUtils.startOfMonth(new Date())
     property int monthRequestToken: 0
 
+    // The events/todos from the last successful refresh(), cached so
+    // toggling a task's subtask fold state (see toggleTaskCollapse) can
+    // re-lay-out agendaItems instantly - it's a pure display change, not
+    // something that needs a fresh CalDAV fetch. todos here is already
+    // filtered by showCompletedTasks, matching what finishRefresh normally
+    // works with.
+    property var lastFetchedEvents: []
+    property var lastFetchedTodos: []
+
     // Same stale-response guard as monthRequestToken above, for refresh()
     // itself: several plasmoid.configuration properties each fire their own
     // change signal independently (e.g. switching which calendars are
@@ -101,6 +110,7 @@ PlasmoidItem {
         monthCursor: root.monthCursor
         onRefreshRequested: root.refresh()
         onToggleTask: root.toggleTaskCompletion(task)
+        onToggleTaskCollapseRequested: root.toggleTaskCollapse(uid)
         onOpenConfigureRequested: plasmoid.internalAction("configure").trigger()
         onCreateTaskRequested: root.createTask(calendarHref, summary, due, description, location)
         onCreateEventRequested: root.createEvent(calendarHref, summary, start, end, allDay, description, location)
@@ -179,7 +189,7 @@ PlasmoidItem {
     }
 
     Component.onCompleted: {
-        console.log("Nextcloud Caldav: build 0.5.12 starting");
+        console.log("Nextcloud Caldav: build 0.5.13 starting");
         refresh();
         if (plasmoid.configuration.viewMode === 1 /* Month */) refreshMonth(monthCursor);
     }
@@ -376,6 +386,14 @@ PlasmoidItem {
     // out entirely (e.g. completed and hidden) - that subtask is just
     // treated as top-level here, there's no sensible parent to attach it
     // to.
+    //
+    // Also stamps `childCount` (every descendant, not just direct
+    // children - that's the number a collapsed task hides) and `collapsed`
+    // on each task that has children, from the persisted
+    // collapsedTaskUids config (see toggleTaskCollapse). A collapsed
+    // task's own row is still included in `out` - only its descendants are
+    // left out entirely, not just visually hidden, so TaskDelegate never
+    // has to know why a row isn't there.
     function orderTasksWithHierarchy(tasks) {
         var byUid = {};
         tasks.forEach(function (t) { if (t.uid) byUid[t.uid] = t; });
@@ -400,10 +418,22 @@ PlasmoidItem {
             return a.due.getTime() - b.due.getTime();
         }
         Object.keys(childrenOf).forEach(function (uid) { childrenOf[uid].sort(byDue); });
+
+        var collapsedUids = plasmoid.configuration.collapsedTaskUids;
+        function countDescendants(t) {
+            var kids = childrenOf[t.uid] || [];
+            var count = kids.length;
+            kids.forEach(function (c) { count += countDescendants(c); });
+            return count;
+        }
+
         var out = [];
         function visit(t, depth) {
             t.depth = depth;
+            t.childCount = countDescendants(t);
+            t.collapsed = t.childCount > 0 && collapsedUids.indexOf(t.uid) !== -1;
             out.push(t);
+            if (t.collapsed) return;
             (childrenOf[t.uid] || []).forEach(function (c) { visit(c, depth + 1); });
         }
         roots.forEach(function (t) { visit(t, 0); });
@@ -438,10 +468,56 @@ PlasmoidItem {
         lastUpdated = new Date();
         lastError = err || "";
 
-        var now = new Date();
         var showCompleted = plasmoid.configuration.showCompletedTasks;
         var showTasks = wantsTasks();
         todos = showTasks ? todos.filter(function (t) { return showCompleted || t.status !== "COMPLETED"; }) : [];
+
+        lastFetchedEvents = events;
+        lastFetchedTodos = todos;
+
+        pruneCollapsedTaskUids(todos, showTasks, err);
+        rebuildAgendaSections();
+    }
+
+    // Forgets a task's persisted fold state once it's no longer relevant -
+    // the task was deleted, or it no longer has any subtasks - so
+    // collapsedTaskUids doesn't grow to remember every task ever folded.
+    // Only runs on a clean, tasks-were-actually-fetched refresh: pruning
+    // against a partial/errored fetch, or against the forced-empty `todos`
+    // used when tasks aren't being shown at all, would wrongly wipe fold
+    // state that's still perfectly valid, just not checked this cycle.
+    function pruneCollapsedTaskUids(todos, showTasks, err) {
+        if (!showTasks || err) return;
+        var todoByUid = {};
+        todos.forEach(function (t) { if (t.uid) todoByUid[t.uid] = t; });
+        var parentUidsWithChildren = {};
+        todos.forEach(function (t) { if (t.parentUid && todoByUid[t.parentUid]) parentUidsWithChildren[t.parentUid] = true; });
+        var stored = plasmoid.configuration.collapsedTaskUids;
+        var pruned = stored.filter(function (uid) { return parentUidsWithChildren[uid]; });
+        if (pruned.length !== stored.length) plasmoid.configuration.collapsedTaskUids = pruned;
+    }
+
+    // Toggles whether a task's subtasks are folded away, and re-lays-out
+    // agendaItems immediately from the last fetched data - no need to hit
+    // the server again just to change what's shown of data already in
+    // hand.
+    function toggleTaskCollapse(uid) {
+        var list = plasmoid.configuration.collapsedTaskUids.slice();
+        var idx = list.indexOf(uid);
+        if (idx === -1) list.push(uid); else list.splice(idx, 1);
+        plasmoid.configuration.collapsedTaskUids = list;
+        rebuildAgendaSections();
+    }
+
+    // Pure layout step: turns lastFetchedEvents/lastFetchedTodos into
+    // agendaItems, honoring the current collapsedTaskUids fold state.
+    // Split out from finishRefresh so toggleTaskCollapse can re-run just
+    // this part without a network round-trip.
+    function rebuildAgendaSections() {
+        var events = lastFetchedEvents;
+        var todos = lastFetchedTodos;
+        var now = new Date();
+        var showTasks = wantsTasks();
 
         // Bucketed by the group root's own due date/status (see
         // groupRootOf), not each task's own - otherwise a subtask due on a
