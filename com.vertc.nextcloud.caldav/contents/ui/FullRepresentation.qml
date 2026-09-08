@@ -59,6 +59,7 @@ Item {
 
     signal refreshRequested()
     signal toggleTask(var task)
+    signal toggleTaskCollapseRequested(string uid)
     signal openConfigureRequested()
     signal createTaskRequested(string calendarHref, string summary, var due, string description, string location)
     signal createEventRequested(string calendarHref, string summary, var start, var end, bool allDay, string description, string location)
@@ -304,6 +305,7 @@ Item {
             taskData: parent.itemData.data
             onToggled: fullRep.toggleTask(parent.itemData.data)
             onEditRequested: itemFormPopup.openForEdit(parent.itemData.data, true)
+            onToggleCollapseRequested: fullRep.toggleTaskCollapseRequested(parent.itemData.data.uid)
         }
     }
 

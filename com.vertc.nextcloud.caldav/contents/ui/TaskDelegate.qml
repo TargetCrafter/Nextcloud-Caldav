@@ -9,9 +9,16 @@ Item {
     required property var taskData
     signal toggled()
     signal editRequested()
+    signal toggleCollapseRequested()
 
     readonly property bool completed: taskData.status === "COMPLETED"
     readonly property int depth: taskData.depth || 0
+    // Stamped by main.qml's orderTasksWithHierarchy: childCount counts
+    // every descendant (not just direct subtasks) a collapsed task hides;
+    // collapsed reflects the persisted per-task fold state. Both are only
+    // meaningful (childCount > 0) on a task that actually has subtasks.
+    readonly property int childCount: taskData.childCount || 0
+    readonly property bool collapsed: !!taskData.collapsed
 
     // See EventDelegate.qml for why this must match the row's own margins.
     implicitHeight: row.implicitHeight + Kirigami.Units.mediumSpacing * 2
@@ -81,6 +88,29 @@ Item {
             // plain text: this renders a server-supplied task summary.
             textFormat: Text.PlainText
             text: delegate.taskData.summary || i18n("(No title)")
+        }
+
+        PlasmaComponents3.Label {
+            // Subtask count, folded task's own row only - see childCount's
+            // declaration above. StyledText (unlike the summary/location
+            // Labels' locked-down PlainText) is safe here since the only
+            // content is our own integer count, never server-supplied text.
+            visible: delegate.childCount > 0
+            opacity: 0.65
+            font.pointSize: Kirigami.Theme.smallFont.pointSize
+            textFormat: Text.StyledText
+            text: "<sup>" + delegate.childCount + "</sup>"
+        }
+
+        PlasmaComponents3.ToolButton {
+            visible: delegate.childCount > 0
+            flat: true
+            icon.name: delegate.collapsed ? "arrow-right" : "arrow-down"
+            Layout.preferredWidth: Kirigami.Units.iconSizes.small + Kirigami.Units.smallSpacing
+            Layout.preferredHeight: Layout.preferredWidth
+            onClicked: delegate.toggleCollapseRequested()
+            PlasmaComponents3.ToolTip.text: delegate.collapsed ? i18n("Show subtasks") : i18n("Hide subtasks")
+            PlasmaComponents3.ToolTip.visible: hovered
         }
 
         Kirigami.Icon {
