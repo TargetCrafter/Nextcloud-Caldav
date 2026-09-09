@@ -29,6 +29,12 @@ Item {
     readonly property bool monthMode: plasmoid.configuration.viewMode === 1 /* Month */ &&
                                        plasmoid.configuration.displayMode !== 2 /* TasksOnly */
     readonly property var selectedDayEvents: computeSelectedDayEvents()
+    // The next day after selectedDate (within the currently loaded month -
+    // see main.qml's refreshMonth) that has at least one event, so the day
+    // detail panel can point at what's coming up even when that's not
+    // "tomorrow" or even later in this same month. null if the rest of the
+    // loaded month has nothing.
+    readonly property var nextEventDay: computeNextEventDay()
 
     // Only jump the selected day when navigating to a month that doesn't
     // contain it (not unconditionally on every monthCursor change, which
@@ -60,6 +66,7 @@ Item {
     signal refreshRequested()
     signal toggleTask(var task)
     signal toggleTaskCollapseRequested(string uid)
+    signal toggleRecentlyClosedRequested()
     signal openConfigureRequested()
     signal createTaskRequested(string calendarHref, string summary, var due, string description, string location)
     signal createEventRequested(string calendarHref, string summary, var start, var end, bool allDay, string description, string location)
@@ -96,6 +103,28 @@ Item {
             return a.dtstart.getTime() - b.dtstart.getTime();
         });
         return list;
+    }
+
+    // Returns { date, events } for the earliest day strictly after
+    // selectedDate that has an event, or null if there isn't one in
+    // monthEvents (which only covers the currently displayed month - this
+    // deliberately doesn't reach into a following month's data that hasn't
+    // been fetched).
+    function computeNextEventDay() {
+        var after = DateUtils.startOfDay(fullRep.selectedDate);
+        after.setDate(after.getDate() + 1);
+        var candidates = fullRep.monthEvents.filter(function (e) {
+            return e.dtstart && e.dtstart.getTime() >= after.getTime();
+        });
+        if (candidates.length === 0) return null;
+        candidates.sort(function (a, b) { return a.dtstart.getTime() - b.dtstart.getTime(); });
+        var day = DateUtils.startOfDay(candidates[0].dtstart);
+        var sameDay = candidates.filter(function (e) { return DateUtils.isSameDay(e.dtstart, day); });
+        sameDay.sort(function (a, b) {
+            if (a.allDay !== b.allDay) return a.allDay ? -1 : 1;
+            return a.dtstart.getTime() - b.dtstart.getTime();
+        });
+        return { date: day, events: sameDay };
     }
 
     Layout.minimumWidth: Kirigami.Units.gridUnit * 20
@@ -182,6 +211,7 @@ Item {
                         switch (modelData.type) {
                         case "dayHeader": return dayHeaderComponent;
                         case "sectionHeader": return dayHeaderComponent;
+                        case "recentlyClosedHeader": return dayHeaderComponent;
                         case "event": return eventComponent;
                         case "task": return taskComponent;
                         default: return null;
@@ -218,6 +248,33 @@ Item {
                 Layout.margins: Kirigami.Units.smallSpacing
                 font.bold: true
                 text: Qt.formatDate(fullRep.selectedDate, "dddd · d MMMM")
+            }
+
+            PlasmaComponents3.Label {
+                // Points at what's actually coming up next, even when
+                // that's several empty days away rather than tomorrow -
+                // see computeNextEventDay's comment.
+                visible: fullRep.nextEventDay !== null
+                Layout.fillWidth: true
+                Layout.leftMargin: Kirigami.Units.smallSpacing
+                Layout.rightMargin: Kirigami.Units.smallSpacing
+                Layout.bottomMargin: Kirigami.Units.smallSpacing
+                opacity: 0.7
+                elide: Text.ElideRight
+                // Renders a server-supplied event summary - see
+                // EventDelegate.qml's summary Label for why this must stay
+                // plain text.
+                textFormat: Text.PlainText
+                text: fullRep.nextEventDay
+                      ? i18n("Next: %1 · %2", Qt.formatDate(fullRep.nextEventDay.date, "d MMMM"),
+                             fullRep.nextEventDay.events[0].summary || i18n("(No title)"))
+                      : ""
+
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: fullRep.selectedDate = fullRep.nextEventDay.date
+                }
             }
 
             PlasmaComponents3.ScrollView {
@@ -273,8 +330,11 @@ Item {
         id: dayHeaderComponent
         DayHeader {
             date: parent.itemData.type === "dayHeader" ? parent.itemData.date : new Date()
-            label: parent.itemData.type === "sectionHeader" ? parent.itemData.label : ""
+            label: parent.itemData.type === "sectionHeader" || parent.itemData.type === "recentlyClosedHeader" ? parent.itemData.label : ""
             count: parent.itemData.count || 0
+            expandable: parent.itemData.type === "recentlyClosedHeader"
+            expanded: !!parent.itemData.expanded
+            onToggleRequested: fullRep.toggleRecentlyClosedRequested()
         }
     }
 

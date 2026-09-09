@@ -111,6 +111,7 @@ PlasmoidItem {
         onRefreshRequested: root.refresh()
         onToggleTask: root.toggleTaskCompletion(task)
         onToggleTaskCollapseRequested: root.toggleTaskCollapse(uid)
+        onToggleRecentlyClosedRequested: root.toggleRecentlyClosedExpanded()
         onOpenConfigureRequested: plasmoid.internalAction("configure").trigger()
         onCreateTaskRequested: root.createTask(calendarHref, summary, due, description, location)
         onCreateEventRequested: root.createEvent(calendarHref, summary, start, end, allDay, description, location)
@@ -189,7 +190,7 @@ PlasmoidItem {
     }
 
     Component.onCompleted: {
-        console.log("Nextcloud Caldav: build 0.5.13 starting");
+        console.log("Nextcloud Caldav: build 0.5.14 starting");
         refresh();
         if (plasmoid.configuration.viewMode === 1 /* Month */) refreshMonth(monthCursor);
     }
@@ -468,9 +469,16 @@ PlasmoidItem {
         lastUpdated = new Date();
         lastError = err || "";
 
-        var showCompleted = plasmoid.configuration.showCompletedTasks;
+        // Cached as fetched - completed tasks included - rather than
+        // pre-filtered by showCompletedTasks like before: the "Recently
+        // closed" section (see rebuildAgendaSections) needs to see
+        // completed tasks regardless of that setting, since its whole
+        // purpose is finding one to re-open even when completed tasks are
+        // otherwise hidden from the main list. showCompletedTasks is now
+        // applied only when building the main list, in
+        // rebuildAgendaSections.
         var showTasks = wantsTasks();
-        todos = showTasks ? todos.filter(function (t) { return showCompleted || t.status !== "COMPLETED"; }) : [];
+        todos = showTasks ? todos : [];
 
         lastFetchedEvents = events;
         lastFetchedTodos = todos;
@@ -509,15 +517,24 @@ PlasmoidItem {
         rebuildAgendaSections();
     }
 
+    // Same instant, no-refetch pattern as toggleTaskCollapse above, for the
+    // single "Recently closed" section.
+    function toggleRecentlyClosedExpanded() {
+        plasmoid.configuration.recentlyClosedExpanded = !plasmoid.configuration.recentlyClosedExpanded;
+        rebuildAgendaSections();
+    }
+
     // Pure layout step: turns lastFetchedEvents/lastFetchedTodos into
     // agendaItems, honoring the current collapsedTaskUids fold state.
     // Split out from finishRefresh so toggleTaskCollapse can re-run just
     // this part without a network round-trip.
     function rebuildAgendaSections() {
         var events = lastFetchedEvents;
-        var todos = lastFetchedTodos;
+        var allTodos = lastFetchedTodos;
         var now = new Date();
         var showTasks = wantsTasks();
+        var showCompleted = plasmoid.configuration.showCompletedTasks;
+        var todos = showCompleted ? allTodos : allTodos.filter(function (t) { return t.status !== "COMPLETED"; });
 
         // Bucketed by the group root's own due date/status (see
         // groupRootOf), not each task's own - otherwise a subtask due on a
@@ -578,6 +595,30 @@ PlasmoidItem {
             noDue.sort(function (a, b) { return priorityRank(a) - priorityRank(b); });
             out.push({ type: "sectionHeader", label: "noDueDate", count: noDue.length });
             orderTasksWithHierarchy(noDue).forEach(function (t) { out.push({ type: "task", data: t }); });
+        }
+
+        // "Recently closed": the most recently completed tasks, always
+        // pulled from allTodos (not the showCompleted-filtered `todos`
+        // above) so this works as a way to find and re-open one even with
+        // "Show completed tasks" off. Flat and un-nested on purpose - it's
+        // a recent-activity list, not a hierarchy - and folded away by
+        // default (see recentlyClosedExpanded), since it's an occasional
+        // undo tool, not something to keep in view.
+        if (showTasks) {
+            var recentlyClosed = allTodos.filter(function (t) { return t.status === "COMPLETED"; });
+            recentlyClosed.sort(function (a, b) {
+                var at = a.completed ? a.completed.getTime() : -Infinity;
+                var bt = b.completed ? b.completed.getTime() : -Infinity;
+                return bt - at;
+            });
+            recentlyClosed = recentlyClosed.slice(0, 10);
+            if (recentlyClosed.length > 0) {
+                var recentlyClosedExpanded = plasmoid.configuration.recentlyClosedExpanded;
+                out.push({ type: "recentlyClosedHeader", label: "recentlyClosed", count: recentlyClosed.length, expanded: recentlyClosedExpanded });
+                if (recentlyClosedExpanded) {
+                    recentlyClosed.forEach(function (t) { out.push({ type: "task", data: t }); });
+                }
+            }
         }
 
         agendaItems = out;

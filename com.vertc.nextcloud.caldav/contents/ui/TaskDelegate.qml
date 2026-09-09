@@ -72,7 +72,7 @@ Item {
         PlasmaComponents3.CheckBox {
             checked: delegate.completed
             onToggled: delegate.toggled()
-            Layout.alignment: Qt.AlignTop
+            Layout.alignment: Qt.AlignVCenter
         }
 
         PlasmaComponents3.Label {
@@ -88,6 +88,21 @@ Item {
             // plain text: this renders a server-supplied task summary.
             textFormat: Text.PlainText
             text: delegate.taskData.summary || i18n("(No title)")
+        }
+
+        // Positioned right after the (fillWidth) summary Label and before
+        // every other fixed-width item in this row on purpose: this button
+        // only appearing on hover shrinks the summary Label by exactly its
+        // own width when it does, which leaves everything after it - the
+        // subtask badge/arrow, the priority icon - at the same on-screen
+        // position either way. Putting it anywhere past those would instead
+        // have made *them* jump left/right every time the row was hovered.
+        PlasmaComponents3.ToolButton {
+            visible: hover.hovered
+            icon.name: "document-edit"
+            onClicked: delegate.editRequested()
+            PlasmaComponents3.ToolTip.text: i18n("Edit…")
+            PlasmaComponents3.ToolTip.visible: hovered
         }
 
         PlasmaComponents3.Label {
@@ -119,14 +134,6 @@ Item {
             color: Kirigami.Theme.negativeTextColor
             Layout.preferredWidth: Kirigami.Units.iconSizes.small
             Layout.preferredHeight: Kirigami.Units.iconSizes.small
-        }
-
-        PlasmaComponents3.ToolButton {
-            visible: hover.hovered
-            icon.name: "document-edit"
-            onClicked: delegate.editRequested()
-            PlasmaComponents3.ToolTip.text: i18n("Edit…")
-            PlasmaComponents3.ToolTip.visible: hovered
         }
     }
 }

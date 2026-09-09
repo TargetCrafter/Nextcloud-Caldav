@@ -45,6 +45,11 @@
     <entry name="collapsedTaskUids" type="StringList">
       <default></default>
     </entry>
+    <!-- Whether the "Recently closed" section (see main.qml's
+         rebuildAgendaSections) is currently open. -->
+    <entry name="recentlyClosedExpanded" type="Bool">
+      <default>false</default>
+    </entry>
   </group>
   <group name="General">
     <entry name="displayMode" type="Enum">
