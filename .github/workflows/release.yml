@@ -30,7 +30,12 @@ jobs:
 
       - name: Build .plasmoid archive
         run: |
-          sudo apt-get update -qq
+          # `|| true`: apt-get update fails its whole exit code if *any*
+          # configured source errors, including third-party ones the
+          # runner image pre-configures and this workflow never touches
+          # (e.g. Google Chrome's repo) - a mirror hiccup there shouldn't
+          # block installing zip, which comes from the base Ubuntu archive.
+          sudo apt-get update -qq || true
           sudo apt-get install -y -qq zip
           ./package.sh
 
