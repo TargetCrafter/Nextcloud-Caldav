@@ -13,6 +13,13 @@ RowLayout {
     property date date
     property string label: ""
     property int count: 0
+    // Only "recentlyClosed" sets these - a fold/expand arrow like
+    // TaskDelegate's subtask one, for a section whose contents are
+    // optional to show at all (unlike "Overdue"/day headers, which are
+    // just labels over content that's always there).
+    property bool expandable: false
+    property bool expanded: true
+    signal toggleRequested()
 
     Layout.fillWidth: true
     Layout.topMargin: Kirigami.Units.smallSpacing
@@ -33,6 +40,13 @@ RowLayout {
         font.pointSize: Kirigami.Theme.defaultFont.pointSize
         color: header.label === "overdue" ? Kirigami.Theme.negativeTextColor : Kirigami.Theme.disabledTextColor
         text: header.text()
+
+        MouseArea {
+            anchors.fill: parent
+            visible: header.expandable
+            cursorShape: Qt.PointingHandCursor
+            onClicked: header.toggleRequested()
+        }
     }
 
     Kirigami.Separator {
@@ -41,9 +55,21 @@ RowLayout {
         opacity: 0.5
     }
 
+    PlasmaComponents3.ToolButton {
+        visible: header.expandable
+        flat: true
+        icon.name: header.expanded ? "arrow-down" : "arrow-right"
+        Layout.preferredWidth: Kirigami.Units.iconSizes.small + Kirigami.Units.smallSpacing
+        Layout.preferredHeight: Layout.preferredWidth
+        onClicked: header.toggleRequested()
+        PlasmaComponents3.ToolTip.text: header.expanded ? i18n("Hide") : i18n("Show")
+        PlasmaComponents3.ToolTip.visible: hovered
+    }
+
     function text() {
         if (label === "overdue") return i18np("Overdue (%1)", "Overdue (%1)", count);
         if (label === "noDueDate") return i18n("No due date");
+        if (label === "recentlyClosed") return i18np("Recently closed (%1)", "Recently closed (%1)", count);
 
         var offset = DateUtils.dayOffset(date);
         if (offset === 0) return i18n("Today · %1", Qt.formatDate(date, "d MMMM"));
