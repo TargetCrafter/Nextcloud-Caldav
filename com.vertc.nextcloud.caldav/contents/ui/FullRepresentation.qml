@@ -127,6 +127,27 @@ Item {
         return { date: day, events: sameDay };
     }
 
+    // "Today"/"Tomorrow"/"This Saturday" read faster than a full date for
+    // the next-event hint below, but only stay unambiguous through the end
+    // of the current week (Sunday-Saturday, matching MonthView's own week
+    // layout) - "This Monday" for a date eight days out could mean either
+    // this coming Monday or next week's, so that falls back to a full date.
+    function formatNextEventDate(date) {
+        var now = fullRep.currentTime;
+        var offset = DateUtils.dayOffset(date, now);
+        if (offset === 0) return i18n("Today");
+        if (offset === 1) return i18n("Tomorrow");
+        if (offset > 1) {
+            var weekStart = DateUtils.startOfDay(now);
+            weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+            var weekEnd = DateUtils.addDays(weekStart, 6);
+            if (date.getTime() <= weekEnd.getTime()) {
+                return i18n("This %1", Qt.formatDate(date, "dddd"));
+            }
+        }
+        return Qt.formatDate(date, "d MMMM");
+    }
+
     Layout.minimumWidth: Kirigami.Units.gridUnit * 20
     Layout.minimumHeight: Kirigami.Units.gridUnit * 24
     Layout.preferredWidth: Kirigami.Units.gridUnit * 24
@@ -266,7 +287,7 @@ Item {
                 // plain text.
                 textFormat: Text.PlainText
                 text: fullRep.nextEventDay
-                      ? i18n("Next: %1 · %2", Qt.formatDate(fullRep.nextEventDay.date, "d MMMM"),
+                      ? i18n("Next: %1 · %2", fullRep.formatNextEventDate(fullRep.nextEventDay.date),
                              fullRep.nextEventDay.events[0].summary || i18n("(No title)"))
                       : ""
 
