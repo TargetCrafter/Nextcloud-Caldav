@@ -16,9 +16,10 @@ file or with `kpackagetool6`.
 
 - Auto-discovers every calendar and task list on your Nextcloud account
 - Subscribe to any external `.ics` feed by URL (`webcal://` or `https://`) as
-  an extra read-only calendar, with your own choice of color and an optional
-  per-calendar filter (e.g. only show events whose title contains
-  " - Race" or " - Qualifying")
+  an extra read-only calendar - editable after adding (URL, name, color) -
+  with an optional per-calendar include/exclude title filter (e.g. only show
+  events whose title contains " - Race" or " - Qualifying", or hide ones
+  containing "Sprint Shootout")
 - Events grouped by day ("Today", "Tomorrow", weekday names), with
   recurring events expanded server-side
 - Tasks (VTODO) grouped into Overdue / due-today / due-later / no due date,

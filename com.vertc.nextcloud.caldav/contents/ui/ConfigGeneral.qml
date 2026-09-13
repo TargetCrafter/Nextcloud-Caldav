@@ -7,7 +7,15 @@ import org.kde.kirigami as Kirigami
 
 import "../code/caldav.js" as CalDAV
 
-Kirigami.FormLayout {
+// A plain ScrollView (rather than the FormLayout below being the root
+// item directly, as it used to be) so this page scrolls internally once
+// its content - e.g. several calendars with their filter box open at
+// once - is taller than the config window. The standalone "Configure…"
+// window this loads into doesn't add any scrolling of its own: without
+// this, taller-than-the-window content (like a calendar's filter editor)
+// pushed the OK/Apply/Cancel buttons and everything below it out of reach
+// entirely, with no way to get to them.
+QQC2.ScrollView {
     id: page
 
     property alias cfg_serverUrl: serverUrlField.text
@@ -27,9 +35,15 @@ Kirigami.FormLayout {
     property string discoverError: ""
     property var discovered: []
 
-    // "Add calendar by URL" form state.
+    // "Add/Edit calendar by URL" form state. icsEditingHref is the href of
+    // the calendar currently being edited (see startEditIcsCalendar),
+    // empty when the form is in "add a new one" mode instead.
     property color icsColor: "#3daee9"
     property string icsAddError: ""
+    property string icsEditingHref: ""
+
+    Kirigami.FormLayout {
+        width: page.width
 
     QQC2.TextField {
         id: serverUrlField
@@ -236,11 +250,21 @@ Kirigami.FormLayout {
                     QQC2.Button {
                         flat: true
                         text: {
-                            var n = page.filterCount(modelData.filtersText);
                             if (calRow.filtersOpen) return i18n("Hide filter");
-                            return n > 0 ? i18n("Filter (%1)", n) : i18n("Filter…");
+                            var inCount = page.filterCount(modelData.filtersText);
+                            var outCount = page.filterCount(modelData.excludeFiltersText);
+                            if (inCount === 0 && outCount === 0) return i18n("Filter…");
+                            return i18n("Filter (%1 in, %2 out)", inCount, outCount);
                         }
                         onClicked: calRow.filtersOpen = !calRow.filtersOpen
+                    }
+
+                    QQC2.ToolButton {
+                        visible: modelData.source === "ics"
+                        icon.name: "document-edit"
+                        onClicked: page.startEditIcsCalendar(modelData)
+                        PlasmaComponents3.ToolTip.text: i18n("Edit URL, name, or color…")
+                        PlasmaComponents3.ToolTip.visible: hovered
                     }
 
                     QQC2.ToolButton {
@@ -252,14 +276,53 @@ Kirigami.FormLayout {
                     }
                 }
 
-                QQC2.TextArea {
+                ColumnLayout {
                     Layout.fillWidth: true
                     Layout.leftMargin: Kirigami.Units.gridUnit
                     visible: calRow.filtersOpen
-                    placeholderText: i18n("One filter per line - only events/tasks whose title contains at least one (case-insensitive) are shown. Leave empty to show everything.")
-                    text: modelData.filtersText
-                    wrapMode: TextEdit.Wrap
-                    onEditingFinished: page.setCalendarFilters(modelData.href, text)
+                    spacing: Kirigami.Units.smallSpacing / 2
+
+                    QQC2.Label {
+                        opacity: 0.7
+                        font.pointSize: Kirigami.Theme.smallFont.pointSize
+                        text: i18n("Only show if title contains (one per line, optional):")
+                    }
+
+                    // Its own small ScrollView with a fixed height, rather
+                    // than just growing with content, so a filter list with
+                    // many lines can't blow up the page's height either -
+                    // it scrolls internally instead.
+                    QQC2.ScrollView {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: Kirigami.Units.gridUnit * 3
+                        clip: true
+
+                        QQC2.TextArea {
+                            placeholderText: i18n("e.g. - Race")
+                            text: modelData.filtersText
+                            wrapMode: TextEdit.Wrap
+                            onEditingFinished: page.setCalendarFilters(modelData.href, text)
+                        }
+                    }
+
+                    QQC2.Label {
+                        opacity: 0.7
+                        font.pointSize: Kirigami.Theme.smallFont.pointSize
+                        text: i18n("Hide if title contains (one per line, optional):")
+                    }
+
+                    QQC2.ScrollView {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: Kirigami.Units.gridUnit * 3
+                        clip: true
+
+                        QQC2.TextArea {
+                            placeholderText: i18n("e.g. Sprint Shootout")
+                            text: modelData.excludeFiltersText
+                            wrapMode: TextEdit.Wrap
+                            onEditingFinished: page.setCalendarExcludeFilters(modelData.href, text)
+                        }
+                    }
                 }
             }
         }
@@ -276,7 +339,7 @@ Kirigami.FormLayout {
     }
 
     RowLayout {
-        Kirigami.FormData.label: i18n("Add calendar by URL:")
+        Kirigami.FormData.label: page.icsEditingHref !== "" ? i18n("Edit calendar URL:") : i18n("Add calendar by URL:")
         spacing: Kirigami.Units.smallSpacing
 
         QQC2.TextField {
@@ -316,9 +379,15 @@ Kirigami.FormLayout {
         }
 
         QQC2.Button {
-            text: i18n("Add")
+            text: page.icsEditingHref !== "" ? i18n("Save") : i18n("Add")
             enabled: icsUrlField.text.trim().length > 0
-            onClicked: page.addIcsCalendar()
+            onClicked: page.saveIcsCalendar()
+        }
+
+        QQC2.Button {
+            text: i18n("Cancel")
+            visible: page.icsEditingHref !== ""
+            onClicked: page.cancelIcsEdit()
         }
     }
 
@@ -351,6 +420,8 @@ Kirigami.FormLayout {
         repeat: true
         onTriggered: page.pollLogin()
     }
+
+    } // Kirigami.FormLayout
 
     function startLogin() {
         loginState = "requesting";
@@ -462,6 +533,7 @@ Kirigami.FormLayout {
         var kinds = plasmoid.configuration.calendarKinds.slice();
         var sources = plasmoid.configuration.calendarSources.slice();
         var filtersList = plasmoid.configuration.calendarFilters.slice();
+        var excludeFiltersList = plasmoid.configuration.calendarExcludeFilters.slice();
         // "+" rather than "," on purpose: calendarKinds is itself a
         // KConfigXT StringList, whose own on-disk serialization already
         // uses "," as the separator *between* list entries, so joining a
@@ -475,20 +547,23 @@ Kirigami.FormLayout {
         if (idx === -1) {
             padTo(sources, urls.length, "caldav");
             padTo(filtersList, urls.length, "");
+            padTo(excludeFiltersList, urls.length, "");
             urls.push(cal.href);
             names.push(cal.displayName);
             colors.push(cal.color || "#3daee9");
             kinds.push(kindsStr);
             sources.push("caldav");
             filtersList.push("");
+            excludeFiltersList.push("");
         } else {
             names[idx] = cal.displayName;
             colors[idx] = cal.color || colors[idx];
             kinds[idx] = kindsStr;
-            // sources[idx]/filtersList[idx] deliberately left alone -
-            // re-discovering a calendar that's already known (the normal
-            // case on every "Find calendars" click) must not reset a
-            // calendar's own source or clear filters the user already set.
+            // sources[idx]/filtersList[idx]/excludeFiltersList[idx]
+            // deliberately left alone - re-discovering a calendar that's
+            // already known (the normal case on every "Find calendars"
+            // click) must not reset a calendar's own source or clear
+            // filters the user already set.
         }
         plasmoid.configuration.calendarUrls = urls;
         plasmoid.configuration.calendarNames = names;
@@ -496,6 +571,7 @@ Kirigami.FormLayout {
         plasmoid.configuration.calendarKinds = kinds;
         plasmoid.configuration.calendarSources = sources;
         plasmoid.configuration.calendarFilters = filtersList;
+        plasmoid.configuration.calendarExcludeFilters = excludeFiltersList;
     }
 
     function setCalendarEnabled(href, enabled) {
@@ -525,6 +601,17 @@ Kirigami.FormLayout {
         rebuildDiscoveredFromConfig();
     }
 
+    function setCalendarExcludeFilters(href, text) {
+        var urls = plasmoid.configuration.calendarUrls;
+        var idx = urls.indexOf(href);
+        if (idx === -1) return;
+        var excludeFiltersList = plasmoid.configuration.calendarExcludeFilters.slice();
+        padTo(excludeFiltersList, urls.length, "");
+        excludeFiltersList[idx] = text;
+        plasmoid.configuration.calendarExcludeFilters = excludeFiltersList;
+        rebuildDiscoveredFromConfig();
+    }
+
     function setCalendarColor(href, colorValue) {
         var urls = plasmoid.configuration.calendarUrls;
         var idx = urls.indexOf(href);
@@ -544,52 +631,95 @@ Kirigami.FormLayout {
         var kinds = plasmoid.configuration.calendarKinds.slice();
         var sources = plasmoid.configuration.calendarSources.slice();
         var filtersList = plasmoid.configuration.calendarFilters.slice();
+        var excludeFiltersList = plasmoid.configuration.calendarExcludeFilters.slice();
         urls.splice(idx, 1);
         names.splice(idx, 1);
         colors.splice(idx, 1);
         kinds.splice(idx, 1);
         if (idx < sources.length) sources.splice(idx, 1);
         if (idx < filtersList.length) filtersList.splice(idx, 1);
+        if (idx < excludeFiltersList.length) excludeFiltersList.splice(idx, 1);
         plasmoid.configuration.calendarUrls = urls;
         plasmoid.configuration.calendarNames = names;
         plasmoid.configuration.calendarColors = colors;
         plasmoid.configuration.calendarKinds = kinds;
         plasmoid.configuration.calendarSources = sources;
         plasmoid.configuration.calendarFilters = filtersList;
+        plasmoid.configuration.calendarExcludeFilters = excludeFiltersList;
         setCalendarEnabled(href, false);
+        if (icsEditingHref === href) cancelIcsEdit();
         rebuildDiscoveredFromConfig();
     }
 
-    function addIcsCalendar() {
+    // Populates the "Add calendar by URL" form from an existing ics
+    // calendar so saveIcsCalendar() below updates it in place instead of
+    // adding a second one.
+    function startEditIcsCalendar(cal) {
+        icsEditingHref = cal.href;
+        icsAddError = "";
+        icsUrlField.text = cal.href;
+        icsNameField.text = cal.displayName;
+        icsColor = cal.color || "#3daee9";
+    }
+
+    function cancelIcsEdit() {
+        icsEditingHref = "";
+        icsAddError = "";
+        icsUrlField.text = "";
+        icsNameField.text = "";
+        icsColor = "#3daee9";
+    }
+
+    // Handles both "Add" (icsEditingHref empty) and "Save" (editing an
+    // existing ics calendar, populated by startEditIcsCalendar above).
+    function saveIcsCalendar() {
         icsAddError = "";
         var url = CalDAV.normalizeIcsUrl(icsUrlField.text);
         if (!/^https?:\/\//i.test(url)) {
             icsAddError = i18n("Enter a webcal://, http://, or https:// address.");
             return;
         }
+
         var urls = plasmoid.configuration.calendarUrls.slice();
-        if (urls.indexOf(url) !== -1) {
+        var editingIdx = icsEditingHref !== "" ? urls.indexOf(icsEditingHref) : -1;
+        var collidingIdx = urls.indexOf(url);
+        if (collidingIdx !== -1 && collidingIdx !== editingIdx) {
             icsAddError = i18n("This calendar is already added.");
             return;
         }
+
         var names = plasmoid.configuration.calendarNames.slice();
         var colors = plasmoid.configuration.calendarColors.slice();
         var kinds = plasmoid.configuration.calendarKinds.slice();
         var sources = plasmoid.configuration.calendarSources.slice();
         var filtersList = plasmoid.configuration.calendarFilters.slice();
+        var excludeFiltersList = plasmoid.configuration.calendarExcludeFilters.slice();
         padTo(sources, urls.length, "caldav");
         padTo(filtersList, urls.length, "");
+        padTo(excludeFiltersList, urls.length, "");
 
         var name = icsNameField.text.trim() || url;
-        urls.push(url);
-        names.push(name);
-        colors.push(page.icsColor.toString());
-        // Always VEVENT-only: a plain .ics feed is display-only (there's
-        // nowhere to PUT a completion toggle back to), so there's no VTODO
-        // handling to offer for it.
-        kinds.push("VEVENT");
-        sources.push("ics");
-        filtersList.push("");
+        var wasEnabled = editingIdx !== -1 && page.isEnabled(icsEditingHref);
+
+        if (editingIdx !== -1) {
+            urls[editingIdx] = url;
+            names[editingIdx] = name;
+            colors[editingIdx] = page.icsColor.toString();
+            // kinds/sources/filters at this index are left as they were -
+            // still VEVENT/"ics", and any filters already set still apply
+            // to whatever the (possibly changed) URL now returns.
+        } else {
+            urls.push(url);
+            names.push(name);
+            colors.push(page.icsColor.toString());
+            // Always VEVENT-only: a plain .ics feed is display-only
+            // (there's nowhere to PUT a completion toggle back to), so
+            // there's no VTODO handling to offer for it.
+            kinds.push("VEVENT");
+            sources.push("ics");
+            filtersList.push("");
+            excludeFiltersList.push("");
+        }
 
         plasmoid.configuration.calendarUrls = urls;
         plasmoid.configuration.calendarNames = names;
@@ -597,13 +727,20 @@ Kirigami.FormLayout {
         plasmoid.configuration.calendarKinds = kinds;
         plasmoid.configuration.calendarSources = sources;
         plasmoid.configuration.calendarFilters = filtersList;
+        plasmoid.configuration.calendarExcludeFilters = excludeFiltersList;
 
-        setCalendarEnabled(url, true);
+        if (editingIdx === -1) {
+            setCalendarEnabled(url, true);
+        } else if (icsEditingHref !== url) {
+            // enabledCalendarUrls stores hrefs directly, so a changed URL
+            // needs re-adding under its new value - and shouldn't force a
+            // calendar the user had deliberately disabled back on.
+            setCalendarEnabled(icsEditingHref, false);
+            if (wasEnabled) setCalendarEnabled(url, true);
+        }
+
         rebuildDiscoveredFromConfig();
-
-        icsUrlField.text = "";
-        icsNameField.text = "";
-        page.icsColor = "#3daee9";
+        cancelIcsEdit();
     }
 
     // Single source of truth for the "Calendars:" list shown above -
@@ -617,6 +754,7 @@ Kirigami.FormLayout {
         var kinds = plasmoid.configuration.calendarKinds;
         var sources = plasmoid.configuration.calendarSources;
         var filtersList = plasmoid.configuration.calendarFilters;
+        var excludeFiltersList = plasmoid.configuration.calendarExcludeFilters;
         var out = [];
         for (var i = 0; i < urls.length; i++) {
             out.push({
@@ -625,7 +763,8 @@ Kirigami.FormLayout {
                 color: colors[i],
                 kinds: (kinds[i] || "VEVENT").split("+"),
                 source: sources[i] || "caldav",
-                filtersText: filtersList[i] || ""
+                filtersText: filtersList[i] || "",
+                excludeFiltersText: excludeFiltersList[i] || ""
             });
         }
         discovered = out;
