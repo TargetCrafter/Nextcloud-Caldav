@@ -177,6 +177,16 @@ PlasmoidItem {
         function onUsernameChanged() { refreshDebounce.restart() }
         function onAppPasswordChanged() { refreshDebounce.restart() }
         function onEnabledCalendarUrlsChanged() { refreshDebounce.restart() }
+        // Only calendarFilters gets its own hook here, not
+        // calendarUrls/Names/Colors/Kinds/Sources: those already only ever
+        // change alongside enabledCalendarUrls (adding/removing a calendar
+        // always enables/disables it too), except when "Find calendars" is
+        // re-run to refresh an already-enabled calendar's metadata - which
+        // has never triggered an immediate refresh either, consistent with
+        // that. Filters are different: editing one on an already-enabled
+        // calendar is the one new control here meant to be iterated on
+        // interactively, so it gets an immediate refresh of its own.
+        function onCalendarFiltersChanged() { refreshDebounce.restart() }
         function onDaysAheadChanged() { refreshDebounce.restart() }
         function onShowTasksChanged() { refreshDebounce.restart() }
         function onShowCompletedTasksChanged() { refreshDebounce.restart() }
@@ -190,7 +200,7 @@ PlasmoidItem {
     }
 
     Component.onCompleted: {
-        console.log("Nextcloud Caldav: build 0.5.15 starting");
+        console.log("Nextcloud Caldav: build 0.5.16 starting");
         refresh();
         if (plasmoid.configuration.viewMode === 1 /* Month */) refreshMonth(monthCursor);
     }
@@ -200,18 +210,35 @@ PlasmoidItem {
         var names = plasmoid.configuration.calendarNames;
         var colors = plasmoid.configuration.calendarColors;
         var kinds = plasmoid.configuration.calendarKinds;
+        var sources = plasmoid.configuration.calendarSources;
+        var filtersList = plasmoid.configuration.calendarFilters;
         var enabled = plasmoid.configuration.enabledCalendarUrls;
         var out = [];
         for (var i = 0; i < urls.length; i++) {
             if (enabled.indexOf(urls[i]) === -1) continue;
+            var filterStr = filtersList[i] || "";
             out.push({
                 href: urls[i],
                 name: names[i] || urls[i],
                 color: colors[i] || "#3daee9",
-                kinds: (kinds[i] || "VEVENT").split("+")
+                kinds: (kinds[i] || "VEVENT").split("+"),
+                // "caldav" for calendars saved before calendarSources
+                // existed - i.e. every calendar discovered via PROPFIND.
+                source: sources[i] || "caldav",
+                filters: filterStr.split("\n").map(function (f) { return f.trim(); }).filter(function (f) { return f.length > 0; })
             });
         }
         return out;
+    }
+
+    // A calendar's filters (see ConfigGeneral.qml's per-calendar "Filter…")
+    // are substrings an event/task's summary must contain at least one of
+    // to be shown - case-insensitive, OR'd together. No filters (the
+    // default for every calendar) means no filtering at all.
+    function matchesCalendarFilters(item, filters) {
+        if (!filters || filters.length === 0) return true;
+        var summary = (item.summary || "").toLowerCase();
+        return filters.some(function (f) { return summary.indexOf(f.toLowerCase()) !== -1; });
     }
 
     function wantsEvents() {
@@ -298,7 +325,7 @@ PlasmoidItem {
                 // before this was added.
                 try {
                     console.log("CalDAV Agenda: requesting events for", cal.name, "at", CalDAV.resolveHref(serverUrl, cal.href));
-                    CalDAV.fetchEvents(serverUrl, username, password, cal.href, rangeStart, rangeEnd, function (err, items) {
+                    CalDAV.fetchCalendarEvents(cal.source, serverUrl, username, password, cal.href, rangeStart, rangeEnd, function (err, items) {
                         console.log("CalDAV Agenda: events response for", cal.name, "- error:", err, "count:", items ? items.length : 0);
                         try {
                             if (err) {
@@ -310,6 +337,7 @@ PlasmoidItem {
                                 try {
                                     var parsed = ICAL.parseCalendarObject(it.icsText, it.href, it.etag, rangeStart, rangeEnd);
                                     parsed.events.forEach(function (e) {
+                                        if (!matchesCalendarFilters(e, cal.filters)) return;
                                         e.calendarColor = cal.color;
                                         e.calendarName = cal.name;
                                         e.calendarHref = cal.href;
@@ -348,6 +376,7 @@ PlasmoidItem {
                                 try {
                                     var parsed = ICAL.parseCalendarObject(it.icsText, it.href, it.etag, rangeStart, rangeEnd);
                                     parsed.todos.forEach(function (t) {
+                                        if (!matchesCalendarFilters(t, cal.filters)) return;
                                         t.calendarColor = cal.color;
                                         t.calendarName = cal.name;
                                         t.calendarHref = cal.href;
@@ -816,7 +845,7 @@ PlasmoidItem {
 
         calendars.forEach(function (cal) {
             try {
-                CalDAV.fetchEvents(serverUrl, username, password, cal.href, rangeStart, rangeEnd, function (err, items) {
+                CalDAV.fetchCalendarEvents(cal.source, serverUrl, username, password, cal.href, rangeStart, rangeEnd, function (err, items) {
                     try {
                         if (err) {
                             firstError = firstError || err;
@@ -826,6 +855,7 @@ PlasmoidItem {
                             try {
                                 var parsed = ICAL.parseCalendarObject(it.icsText, it.href, it.etag, rangeStart, rangeEnd);
                                 parsed.events.forEach(function (e) {
+                                    if (!matchesCalendarFilters(e, cal.filters)) return;
                                     e.calendarColor = cal.color;
                                     e.calendarName = cal.name;
                                     e.calendarHref = cal.href;

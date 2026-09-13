@@ -36,6 +36,23 @@
     <entry name="enabledCalendarUrls" type="StringList">
       <default></default>
     </entry>
+    <!-- "ics" for a directly-subscribed external .ics feed URL (see
+         ConfigGeneral.qml's "Add calendar by URL"); "caldav" (or missing,
+         for calendars saved before this existed) for one discovered from
+         the Nextcloud account via PROPFIND. One entry per calendarUrls
+         entry - see main.qml's enabledCalendarList(). -->
+    <entry name="calendarSources" type="StringList">
+      <default></default>
+    </entry>
+    <!-- Per-calendar substring filters: one calendarUrls entry per line,
+         multiple filter phrases within an entry joined by "\n" (the same
+         "combine into one StringList slot" trick calendarKinds uses with
+         "+"). An event/task must contain at least one (case-insensitively)
+         to be shown; empty means no filtering. See main.qml's
+         matchesCalendarFilters(). -->
+    <entry name="calendarFilters" type="StringList">
+      <default></default>
+    </entry>
   </group>
   <group name="TaskListState">
     <!-- UIDs of parent tasks whose subtasks are currently folded away.
