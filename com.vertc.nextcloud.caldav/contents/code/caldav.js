@@ -184,6 +184,56 @@ function fetchEvents(serverUrl, username, password, calendarHref, rangeStart, ra
     });
 }
 
+// webcal:// is a scheme alias meaning "fetch this over https:// as a plain
+// .ics feed" (a long-standing subscription-link convention) - QML's
+// XMLHttpRequest doesn't understand it, so it's rewritten before ever being
+// stored or fetched.
+function normalizeIcsUrl(url) {
+    var trimmed = (url || "").trim();
+    if (/^webcal:\/\//i.test(trimmed)) trimmed = "https://" + trimmed.substring("webcal://".length);
+    return trimmed;
+}
+
+// Plain, unauthenticated GET of an arbitrary external .ics feed URL - used
+// for user-added "subscribe by URL" calendars (see ConfigGeneral.qml's "Add
+// calendar by URL"). Deliberately does not go through sendRequest/
+// setAuthHeader: those feeds are typically public and unauthenticated, and
+// sending this widget's Nextcloud Basic Auth credentials to some
+// third-party host the user just typed in would leak them to whoever
+// controls that URL.
+function fetchIcsUrl(url, callback) {
+    var xhr = new XMLHttpRequest();
+    xhr.open("GET", url, true);
+    xhr.setRequestHeader("Accept", "text/calendar");
+    xhr.onreadystatechange = function () {
+        if (xhr.readyState !== XMLHttpRequest.DONE) return;
+        if (xhr.status >= 200 && xhr.status < 300) {
+            callback(null, xhr.responseText);
+        } else {
+            callback(describeHttpError(xhr.status), null);
+        }
+    };
+    xhr.onerror = function () { callback("network", null); };
+    xhr.send();
+}
+
+// Single entry point main.qml's refresh()/refreshMonth() use for fetching
+// a calendar's events, dispatching on cal.source so callers don't need
+// their own branching. "ics" calendars go through fetchIcsUrl above (no
+// credentials, no SabreDAV ?export query - the whole feed is fetched every
+// time and expanded/filtered client-side); everything else is the existing
+// Nextcloud CalDAV path.
+function fetchCalendarEvents(source, serverUrl, username, password, calendarHref, rangeStart, rangeEnd, callback) {
+    if (source === "ics") {
+        fetchIcsUrl(calendarHref, function (err, icsText) {
+            if (err) { callback(err, null); return; }
+            callback(null, [{ href: calendarHref, etag: null, icsText: icsText }]);
+        });
+        return;
+    }
+    fetchEvents(serverUrl, username, password, calendarHref, rangeStart, rangeEnd, callback);
+}
+
 // callback(error, items) where items is [{ href, etag, icsText }], one per
 // task. Every VTODO in the collection is returned; completion/due-date
 // filtering happens client-side since CalDAV time-range semantics for

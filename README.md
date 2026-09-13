@@ -15,6 +15,10 @@ file or with `kpackagetool6`.
 ## Features
 
 - Auto-discovers every calendar and task list on your Nextcloud account
+- Subscribe to any external `.ics` feed by URL (`webcal://` or `https://`) as
+  an extra read-only calendar, with your own choice of color and an optional
+  per-calendar filter (e.g. only show events whose title contains
+  " - Race" or " - Qualifying")
 - Events grouped by day ("Today", "Tomorrow", weekday names), with
   recurring events expanded server-side
 - Tasks (VTODO) grouped into Overdue / due-today / due-later / no due date,
@@ -147,6 +151,13 @@ To remove it: `kpackagetool6 --type Plasma/Applet --remove com.vertc.nextcloud.c
   - A best-effort client-side RRULE expander (daily/weekly/monthly/yearly,
     weekday sets) still exists in `ical.js` as a fallback for any VEVENT
     that reaches the parser with an un-expanded `RRULE` still attached.
+- **Calendars added by URL** (a plain `.ics` feed, not your Nextcloud
+  account) are fetched with a plain, unauthenticated `GET` — never with your
+  Nextcloud username/app password, since that would leak your account
+  credentials to whatever third-party host the URL points at. The whole
+  feed is re-fetched and re-parsed client-side (via the same `ical.js` used
+  for everything else) on every refresh, since these feeds don't support
+  Nextcloud's `?export` date-range extension.
 
 ## Known limitations
 
