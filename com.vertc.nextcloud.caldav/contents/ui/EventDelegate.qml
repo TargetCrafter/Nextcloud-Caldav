@@ -69,6 +69,14 @@ Item {
             PlasmaComponents3.Label {
                 Layout.fillWidth: true
                 elide: Text.ElideRight
+                // Strikethrough on top of the whole card's opacity dip
+                // (see isPast/the Item's own opacity above) - same "done,
+                // crossed off" language TaskDelegate already uses for a
+                // completed task - so a past event reads as clearly over,
+                // rather than just looking a bit faded, and can't be
+                // mistaken for the month view's plain, never-struck-through
+                // "Next: …" hint text.
+                font.strikeout: delegate.isPast
                 // Plain, not the Label default of AutoText: this renders a
                 // server-supplied event summary, and Qt's rich-text
                 // auto-detection would otherwise turn HTML-looking content
