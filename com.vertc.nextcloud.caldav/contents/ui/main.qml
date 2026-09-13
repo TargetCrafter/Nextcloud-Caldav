@@ -187,6 +187,7 @@ PlasmoidItem {
         // calendar is the one new control here meant to be iterated on
         // interactively, so it gets an immediate refresh of its own.
         function onCalendarFiltersChanged() { refreshDebounce.restart() }
+        function onCalendarExcludeFiltersChanged() { refreshDebounce.restart() }
         function onDaysAheadChanged() { refreshDebounce.restart() }
         function onShowTasksChanged() { refreshDebounce.restart() }
         function onShowCompletedTasksChanged() { refreshDebounce.restart() }
@@ -200,7 +201,7 @@ PlasmoidItem {
     }
 
     Component.onCompleted: {
-        console.log("Nextcloud Caldav: build 0.5.16 starting");
+        console.log("Nextcloud Caldav: build 0.5.17 starting");
         refresh();
         if (plasmoid.configuration.viewMode === 1 /* Month */) refreshMonth(monthCursor);
     }
@@ -212,11 +213,11 @@ PlasmoidItem {
         var kinds = plasmoid.configuration.calendarKinds;
         var sources = plasmoid.configuration.calendarSources;
         var filtersList = plasmoid.configuration.calendarFilters;
+        var excludeFiltersList = plasmoid.configuration.calendarExcludeFilters;
         var enabled = plasmoid.configuration.enabledCalendarUrls;
         var out = [];
         for (var i = 0; i < urls.length; i++) {
             if (enabled.indexOf(urls[i]) === -1) continue;
-            var filterStr = filtersList[i] || "";
             out.push({
                 href: urls[i],
                 name: names[i] || urls[i],
@@ -225,20 +226,31 @@ PlasmoidItem {
                 // "caldav" for calendars saved before calendarSources
                 // existed - i.e. every calendar discovered via PROPFIND.
                 source: sources[i] || "caldav",
-                filters: filterStr.split("\n").map(function (f) { return f.trim(); }).filter(function (f) { return f.length > 0; })
+                filters: splitFilterLines(filtersList[i]),
+                excludeFilters: splitFilterLines(excludeFiltersList[i])
             });
         }
         return out;
     }
 
+    function splitFilterLines(text) {
+        return (text || "").split("\n").map(function (f) { return f.trim(); }).filter(function (f) { return f.length > 0; });
+    }
+
     // A calendar's filters (see ConfigGeneral.qml's per-calendar "Filter…")
-    // are substrings an event/task's summary must contain at least one of
-    // to be shown - case-insensitive, OR'd together. No filters (the
-    // default for every calendar) means no filtering at all.
-    function matchesCalendarFilters(item, filters) {
-        if (!filters || filters.length === 0) return true;
+    // are substrings an event/task's summary is checked against,
+    // case-insensitively. excludeFilters wins outright - a match there
+    // hides the item regardless of includeFilters, so "hide everything
+    // matching X" works without needing an include list at all. With no
+    // includeFilters, everything not excluded is shown (the default).
+    function matchesCalendarFilters(item, includeFilters, excludeFilters) {
         var summary = (item.summary || "").toLowerCase();
-        return filters.some(function (f) { return summary.indexOf(f.toLowerCase()) !== -1; });
+        if (excludeFilters && excludeFilters.length > 0 &&
+            excludeFilters.some(function (f) { return summary.indexOf(f.toLowerCase()) !== -1; })) {
+            return false;
+        }
+        if (!includeFilters || includeFilters.length === 0) return true;
+        return includeFilters.some(function (f) { return summary.indexOf(f.toLowerCase()) !== -1; });
     }
 
     function wantsEvents() {
@@ -337,7 +349,7 @@ PlasmoidItem {
                                 try {
                                     var parsed = ICAL.parseCalendarObject(it.icsText, it.href, it.etag, rangeStart, rangeEnd);
                                     parsed.events.forEach(function (e) {
-                                        if (!matchesCalendarFilters(e, cal.filters)) return;
+                                        if (!matchesCalendarFilters(e, cal.filters, cal.excludeFilters)) return;
                                         e.calendarColor = cal.color;
                                         e.calendarName = cal.name;
                                         e.calendarHref = cal.href;
@@ -376,7 +388,7 @@ PlasmoidItem {
                                 try {
                                     var parsed = ICAL.parseCalendarObject(it.icsText, it.href, it.etag, rangeStart, rangeEnd);
                                     parsed.todos.forEach(function (t) {
-                                        if (!matchesCalendarFilters(t, cal.filters)) return;
+                                        if (!matchesCalendarFilters(t, cal.filters, cal.excludeFilters)) return;
                                         t.calendarColor = cal.color;
                                         t.calendarName = cal.name;
                                         t.calendarHref = cal.href;
@@ -855,7 +867,7 @@ PlasmoidItem {
                             try {
                                 var parsed = ICAL.parseCalendarObject(it.icsText, it.href, it.etag, rangeStart, rangeEnd);
                                 parsed.events.forEach(function (e) {
-                                    if (!matchesCalendarFilters(e, cal.filters)) return;
+                                    if (!matchesCalendarFilters(e, cal.filters, cal.excludeFilters)) return;
                                     e.calendarColor = cal.color;
                                     e.calendarName = cal.name;
                                     e.calendarHref = cal.href;

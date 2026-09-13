@@ -53,6 +53,13 @@
     <entry name="calendarFilters" type="StringList">
       <default></default>
     </entry>
+    <!-- Same shape as calendarFilters, but exclusion instead of inclusion:
+         an event/task containing any of these (case-insensitively) is
+         hidden, checked before calendarFilters so an exclude always wins
+         over an include. See main.qml's matchesCalendarFilters(). -->
+    <entry name="calendarExcludeFilters" type="StringList">
+      <default></default>
+    </entry>
   </group>
   <group name="TaskListState">
     <!-- UIDs of parent tasks whose subtasks are currently folded away.
