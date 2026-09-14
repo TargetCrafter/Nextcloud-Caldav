@@ -41,6 +41,9 @@ file or with `kpackagetool6`.
   dots marking days that have events, a Today button, and click-to-inspect
   days
 - New-item date fields follow your system's day/month order
+- Desktop notifications for an event's own reminder (VALARM, e.g. set in
+  Nextcloud Calendar) and for a task becoming due soon (configurable
+  lead time), both toggleable in Appearance settings
 
 ## Multiple widgets: separate calendar and to-do lists
 
@@ -162,6 +165,14 @@ To remove it: `kpackagetool6 --type Plasma/Applet --remove com.vertc.nextcloud.c
 
 ## Known limitations
 
+- **Notifications only fire while the widget is loaded** - added to a
+  panel or desktop and actively running - checked once a minute against
+  whatever was fetched by the last refresh. There's no separate
+  background service, so a reminder due while the widget isn't loaded
+  (removed, or Plasma not running) is simply missed, not queued up for
+  later. VALARM triggers relative to an event's end (`RELATED=END`) and
+  absolute (`VALUE=DATE-TIME`) triggers are supported; the common
+  relative-to-start case is what real-world calendars almost always use.
 - **Nextcloud-specific**: fetching relies on SabreDAV's `?export`
   extension (see above), not the base CalDAV `REPORT` method. It should
   work against any SabreDAV-based server (Nextcloud, ownCloud) but not

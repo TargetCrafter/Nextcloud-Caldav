@@ -1,6 +1,7 @@
 import QtQuick
 import org.kde.plasma.plasmoid
 import org.kde.plasma.core as PlasmaCore
+import org.kde.notification
 
 import "../code/caldav.js" as CalDAV
 import "../code/ical.js" as ICAL
@@ -54,6 +55,19 @@ PlasmoidItem {
     // works with.
     property var lastFetchedEvents: []
     property var lastFetchedTodos: []
+
+    // Notifications (event VALARM reminders, tasks becoming due soon) -
+    // see checkNotifications() below. lastNotificationCheck marks the end
+    // of the window already checked, so only a trigger that falls *after*
+    // it (and up to "now") fires - not everything already in the past,
+    // which would otherwise flood the user with notifications for
+    // long-since-passed reminders the moment the widget starts up.
+    // firedNotificationKeys is a plain object used as a set (key -> true)
+    // so the same trigger doesn't re-notify on every later check/refresh;
+    // both are in-memory only, reset on restart, which is fine - each
+    // trigger only needs to fire once during a single continuous run.
+    property date lastNotificationCheck: new Date()
+    property var firedNotificationKeys: ({})
 
     // Same stale-response guard as monthRequestToken above, for refresh()
     // itself: several plasmoid.configuration properties each fire their own
@@ -128,7 +142,32 @@ PlasmoidItem {
         interval: 60000
         running: true
         repeat: true
-        onTriggered: root.currentTime = new Date()
+        onTriggered: {
+            root.currentTime = new Date();
+            root.checkNotifications();
+        }
+    }
+
+    // Reused for every event-reminder notification rather than one
+    // Notification object per event: sendEvent() dispatches using the
+    // object's properties at the moment it's called, and since QML JS
+    // runs single-threaded, setting title/text then immediately calling
+    // sendEvent() in the same synchronous loop iteration (see
+    // checkNotifications) can't race a later iteration's assignment.
+    Notification {
+        id: eventAlarmNotification
+        componentName: "plasma_workspace"
+        eventId: "notification"
+        iconName: "view-calendar"
+        urgency: Notification.NormalUrgency
+    }
+
+    Notification {
+        id: taskDueSoonNotification
+        componentName: "plasma_workspace"
+        eventId: "notification"
+        iconName: "view-calendar-tasks"
+        urgency: Notification.NormalUrgency
     }
 
     Timer {
@@ -201,7 +240,7 @@ PlasmoidItem {
     }
 
     Component.onCompleted: {
-        console.log("Nextcloud Caldav: build 0.5.18 starting");
+        console.log("Nextcloud Caldav: build 0.5.19 starting");
         refresh();
         if (plasmoid.configuration.viewMode === 1 /* Month */) refreshMonth(monthCursor);
     }
@@ -676,6 +715,87 @@ PlasmoidItem {
         if (upcoming.length === 0) return null;
         upcoming.sort(sortEvents);
         return upcoming[0];
+    }
+
+    // Resolves one VALARM entry (see ical.js's extractAlarms) to the
+    // actual Date it fires at, for a given event. null if it can't be
+    // resolved (e.g. a relative trigger on an event with no dtstart/dtend
+    // to anchor against - shouldn't normally happen, but events are
+    // server data, not something to trust blindly).
+    function eventAlarmTriggerDate(alarm, event) {
+        if (alarm.absolute) return alarm.absolute;
+        var anchor = alarm.related === "END" ? event.dtend : event.dtstart;
+        if (!anchor) return null;
+        return new Date(anchor.getTime() + alarm.offsetMs);
+    }
+
+    // Same idea for a task, always anchored on its own due date (or
+    // dtstart if it has no due date but does have a start) - VTODO alarms
+    // are conventionally "before it's due", unlike VEVENT's start/end
+    // choice.
+    function taskAlarmTriggerDate(alarm, task) {
+        if (alarm.absolute) return alarm.absolute;
+        var anchor = task.due || task.dtstart;
+        if (!anchor) return null;
+        return new Date(anchor.getTime() + alarm.offsetMs);
+    }
+
+    // Runs every clockTimer tick (once a minute). Fires a desktop
+    // notification for any event VALARM, or any incoming-due task, whose
+    // trigger time falls strictly after lastNotificationCheck and up to
+    // now - i.e. crossed since the last check, not just "any time up to
+    // now", which is what
+    // keeps this from notifying about every already-past reminder the
+    // instant the widget starts up. Reads from the already-fetched
+    // lastFetchedEvents/lastFetchedTodos rather than making its own
+    // network request - this only needs to notice a threshold being
+    // crossed by the clock, not new server data.
+    function checkNotifications() {
+        var now = root.currentTime;
+        var since = lastNotificationCheck;
+        lastNotificationCheck = now;
+
+        if (plasmoid.configuration.notifyEventAlarms) {
+            lastFetchedEvents.forEach(function (e) {
+                (e.alarms || []).forEach(function (alarm) {
+                    var t = eventAlarmTriggerDate(alarm, e);
+                    if (!t || t.getTime() <= since.getTime() || t.getTime() > now.getTime()) return;
+                    var key = "event:" + e.uid + ":" + t.getTime();
+                    if (firedNotificationKeys[key]) return;
+                    firedNotificationKeys[key] = true;
+                    sendEventAlarmNotification(e);
+                });
+            });
+        }
+
+        if (plasmoid.configuration.notifyTasksDueSoon) {
+            var thresholdMs = Math.max(1, plasmoid.configuration.taskDueSoonMinutes) * 60000;
+            lastFetchedTodos.forEach(function (t) {
+                if (t.status === "COMPLETED" || !t.due) return;
+                var dueSoonAt = new Date(t.due.getTime() - thresholdMs);
+                if (dueSoonAt.getTime() <= since.getTime() || dueSoonAt.getTime() > now.getTime()) return;
+                var key = "task:" + t.uid + ":" + t.due.getTime();
+                if (firedNotificationKeys[key]) return;
+                firedNotificationKeys[key] = true;
+                sendTaskDueSoonNotification(t);
+            });
+        }
+    }
+
+    function sendEventAlarmNotification(event) {
+        eventAlarmNotification.title = event.summary || i18n("(No title)");
+        eventAlarmNotification.text = event.allDay
+            ? i18n("All-day event")
+            : i18n("Starts at %1", Qt.formatTime(event.dtstart, plasmoid.configuration.use24HourClock ? "HH:mm" : "h:mm AP"));
+        eventAlarmNotification.sendEvent();
+    }
+
+    function sendTaskDueSoonNotification(task) {
+        taskDueSoonNotification.title = task.summary || i18n("(No title)");
+        taskDueSoonNotification.text = task.dueAllDay
+            ? i18n("Due today")
+            : i18n("Due at %1", Qt.formatTime(task.due, plasmoid.configuration.use24HourClock ? "HH:mm" : "h:mm AP"));
+        taskDueSoonNotification.sendEvent();
     }
 
     function toggleTaskCompletion(task) {

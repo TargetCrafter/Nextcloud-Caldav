@@ -15,6 +15,9 @@ Kirigami.FormLayout {
     property alias cfg_compactMode: compactModeCombo.currentIndex
     property alias cfg_showEventLocation: showLocationCheck.checked
     property alias cfg_use24HourClock: use24HourCheck.checked
+    property alias cfg_notifyEventAlarms: notifyEventAlarmsCheck.checked
+    property alias cfg_notifyTasksDueSoon: notifyTasksDueSoonCheck.checked
+    property alias cfg_taskDueSoonMinutes: taskDueSoonSpin.value
 
     QQC2.ComboBox {
         id: displayModeCombo
@@ -109,5 +112,40 @@ Kirigami.FormLayout {
     QQC2.CheckBox {
         id: use24HourCheck
         text: i18n("Use 24-hour time")
+    }
+
+    Kirigami.Separator {
+        Kirigami.FormData.isSection: true
+    }
+
+    QQC2.CheckBox {
+        id: notifyEventAlarmsCheck
+        Kirigami.FormData.label: i18n("Notifications:")
+        text: i18n("Notify for event reminders")
+    }
+
+    QQC2.Label {
+        Kirigami.FormData.label: " "
+        visible: notifyEventAlarmsCheck.checked
+        Layout.maximumWidth: Kirigami.Units.gridUnit * 20
+        wrapMode: Text.WordWrap
+        font.pointSize: Kirigami.Theme.smallFont.pointSize
+        opacity: 0.75
+        text: i18n("Uses the reminder time already set on the event (e.g. in Nextcloud Calendar) - this doesn't add its own separate reminder.")
+    }
+
+    QQC2.CheckBox {
+        id: notifyTasksDueSoonCheck
+        text: i18n("Notify when a task is due soon")
+    }
+
+    QQC2.SpinBox {
+        id: taskDueSoonSpin
+        Kirigami.FormData.label: i18n("Notify:")
+        enabled: notifyTasksDueSoonCheck.checked
+        from: 1
+        to: 1440
+        textFromValue: (value) => i18np("%1 minute before due", "%1 minutes before due", value)
+        valueFromText: (text) => parseInt(text, 10) || 1
     }
 }

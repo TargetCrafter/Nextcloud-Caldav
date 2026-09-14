@@ -144,7 +144,7 @@ function textValue(map, name) {
     return p ? unescapeText(p.value) : "";
 }
 
-function buildEvent(map, href, etag) {
+function buildEvent(map, href, etag, rawLines) {
     var dtstartProp = first(map, "DTSTART");
     var dtendProp = first(map, "DTEND");
     var durationProp = first(map, "DURATION");
@@ -172,12 +172,18 @@ function buildEvent(map, href, etag) {
         exdates: (map["EXDATE"] || []).map(function (p) { return parseDateTime(p).date; }),
         recurrenceId: recurrenceIdProp ? parseDateTime(recurrenceIdProp).date : null,
         isRecurring: !!first(map, "RRULE") || !!recurrenceIdProp,
+        // Reminders (VALARM) attached to this event - see extractAlarms.
+        // Stored as offsets (not absolute times), so a clone made for a
+        // recurring occurrence (see cloneWithStart) - which just copies
+        // this array by reference - still resolves to a trigger time
+        // relative to *that* occurrence's own dtstart, not the master's.
+        alarms: rawLines ? extractAlarms(rawLines) : [],
         href: href,
         etag: etag
     };
 }
 
-function buildTodo(map, href, etag) {
+function buildTodo(map, href, etag, rawLines) {
     var dueProp = first(map, "DUE");
     var dtstartProp = first(map, "DTSTART");
     var completedProp = first(map, "COMPLETED");
@@ -214,6 +220,8 @@ function buildTodo(map, href, etag) {
         percentComplete: percentProp ? parseInt(percentProp.value, 10) : 0,
         priority: priorityProp ? parseInt(priorityProp.value, 10) : 0,
         parentUid: relatedTo,
+        // See buildEvent's alarms field for the offset-vs-absolute shape.
+        alarms: rawLines ? extractAlarms(rawLines) : [],
         href: href,
         etag: etag,
         rawLines: null // filled in by caller for PUT round-trips
@@ -228,6 +236,40 @@ function applyDuration(date, durationStr) {
     var hours = parseInt(m[4] || "0", 10), mins = parseInt(m[5] || "0", 10), secs = parseInt(m[6] || "0", 10);
     var totalMs = sign * (((weeks * 7 + days) * 24 * 60 * 60) + hours * 3600 + mins * 60 + secs) * 1000;
     return new Date(date.getTime() + totalMs);
+}
+
+// Extracts VALARM sub-components from a VEVENT/VTODO's own (already
+// unfolded) line range - splitComponents finds BEGIN:VALARM/END:VALARM
+// pairs the same way it finds top-level VEVENT/VTODO ones, since a VALARM
+// block is just nested inside its parent's line range. Only TRIGGER is
+// read (ACTION/DESCRIPTION aren't needed - the notification text comes
+// from the event/task's own summary instead). Returns
+// [{ absolute: Date }] for an explicit VALUE=DATE-TIME trigger, or
+// [{ offsetMs, related: "START"|"END" }] for the far more common relative
+// form (e.g. "-PT15M", 15 minutes before). `related` is meaningful for
+// VEVENT only (RELATED=END means relative to DTEND instead of DTSTART);
+// VTODO alarms are always resolved against DUE by the caller.
+function extractAlarms(rawLines) {
+    var alarmBlocks = splitComponents(rawLines, "VALARM");
+    var alarms = [];
+    for (var i = 0; i < alarmBlocks.length; i++) {
+        var map = propsToMap(alarmBlocks[i]);
+        var triggerProp = first(map, "TRIGGER");
+        if (!triggerProp) continue;
+        if (triggerProp.params.VALUE === "DATE-TIME") {
+            var parsed = parseDateTime({ value: triggerProp.value, params: triggerProp.params });
+            alarms.push({ absolute: parsed.date });
+        } else if (/^[+-]?P/.test(triggerProp.value)) {
+            // applyDuration silently returns its input unchanged for a
+            // string that doesn't match the duration pattern, so the
+            // format has to be checked here first - otherwise a malformed
+            // TRIGGER would produce a bogus "0 offset" (exactly at start)
+            // alarm instead of being skipped.
+            var offsetMs = applyDuration(new Date(0), triggerProp.value).getTime();
+            alarms.push({ offsetMs: offsetMs, related: (triggerProp.params.RELATED || "START").toUpperCase() });
+        }
+    }
+    return alarms;
 }
 
 // Parses one CalDAV multi-status "calendar-data" payload (a full VCALENDAR
@@ -247,7 +289,7 @@ function parseCalendarObject(icsText, href, etag, rangeStart, rangeEnd) {
     var overrides = [];
     for (var i = 0; i < veventBlocks.length; i++) {
         var map = propsToMap(veventBlocks[i]);
-        var ev = buildEvent(map, href, etag);
+        var ev = buildEvent(map, href, etag, veventBlocks[i]);
         if (ev.recurrenceId) overrides.push(ev); else masters.push(ev);
     }
 
@@ -275,7 +317,7 @@ function parseCalendarObject(icsText, href, etag, rangeStart, rangeEnd) {
 
     for (var t = 0; t < vtodoBlocks.length; t++) {
         var tmap = propsToMap(vtodoBlocks[t]);
-        var todo = buildTodo(tmap, href, etag);
+        var todo = buildTodo(tmap, href, etag, vtodoBlocks[t]);
         todo.rawLines = vtodoBlocks[t];
         todos.push(todo);
     }

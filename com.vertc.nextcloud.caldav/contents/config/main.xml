@@ -109,6 +109,20 @@
       <label>In compact view, count overdue tasks only</label>
       <default>false</default>
     </entry>
+    <entry name="notifyEventAlarms" type="Bool">
+      <label>Notify for event reminders</label>
+      <default>true</default>
+    </entry>
+    <entry name="notifyTasksDueSoon" type="Bool">
+      <label>Notify when a task is due soon</label>
+      <default>true</default>
+    </entry>
+    <entry name="taskDueSoonMinutes" type="Int">
+      <label>Minutes before due to notify</label>
+      <default>30</default>
+      <min>1</min>
+      <max>1440</max>
+    </entry>
   </group>
   <group name="Appearance">
     <entry name="viewMode" type="Enum">
