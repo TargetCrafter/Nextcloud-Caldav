@@ -460,8 +460,10 @@ function patchTodoStatus(todo, completed) {
 // above, so STATUS, PRIORITY, RELATED-TO and anything else already on the
 // task survive an edit untouched instead of being dropped by rebuilding
 // the object from scratch. `fields.due` is an optional Date; passing none
-// removes it. `fields.description`/`fields.location` are optional strings;
-// an empty string removes the property.
+// removes it. `fields.dueHasTime` writes it as a DATE-TIME (floating local
+// time, like an event's DTSTART) instead of a bare DATE when true.
+// `fields.description`/`fields.location` are optional strings; an empty
+// string removes the property.
 function patchTodoFields(todo, fields) {
     var lines = (todo.rawLines || []).slice();
     var out = [];
@@ -471,7 +473,7 @@ function patchTodoFields(todo, fields) {
         out.push(lines[i]);
     }
     out.push("SUMMARY:" + escapeText(fields.summary));
-    if (fields.due) out.push("DUE;VALUE=DATE:" + formatDateStamp(fields.due));
+    if (fields.due) out.push(fields.dueHasTime ? ("DUE:" + formatLocalDateTimeStamp(fields.due)) : ("DUE;VALUE=DATE:" + formatDateStamp(fields.due)));
     if (fields.description) out.push("DESCRIPTION:" + escapeText(fields.description));
     if (fields.location) out.push("LOCATION:" + escapeText(fields.location));
     return "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//KDE-Caldav//CalDAV Agenda//EN\nBEGIN:VTODO\n" +
@@ -519,9 +521,11 @@ function formatLocalDateTimeStamp(date) {
 }
 
 // Builds a brand-new VTODO's ICS text for creation. `due` is an optional
-// Date (treated as a DATE, not DATE-TIME - due dates don't need a time of
-// day for this app's purposes). `parentUid` is optional, for creating a
-// subtask under an existing task.
+// Date, written as a bare DATE unless `opts.dueHasTime` is set, in which
+// case it's written as a DATE-TIME (floating local time, like an event's
+// DTSTART) - due dates default to no time of day, but the editor lets one
+// be added. `parentUid` is optional, for creating a subtask under an
+// existing task.
 function buildVTodoIcs(opts) {
     var lines = [
         "BEGIN:VCALENDAR",
@@ -534,7 +538,7 @@ function buildVTodoIcs(opts) {
         "STATUS:NEEDS-ACTION",
         "PERCENT-COMPLETE:0"
     ];
-    if (opts.due) lines.push("DUE;VALUE=DATE:" + formatDateStamp(opts.due));
+    if (opts.due) lines.push(opts.dueHasTime ? ("DUE:" + formatLocalDateTimeStamp(opts.due)) : ("DUE;VALUE=DATE:" + formatDateStamp(opts.due)));
     if (opts.description) lines.push("DESCRIPTION:" + escapeText(opts.description));
     if (opts.location) lines.push("LOCATION:" + escapeText(opts.location));
     if (opts.parentUid) lines.push("RELATED-TO:" + opts.parentUid);
