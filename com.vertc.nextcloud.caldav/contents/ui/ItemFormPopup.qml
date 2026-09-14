@@ -42,6 +42,9 @@ QQC2.Popup {
     // Prefilled start/due date for a new item: the day selected in the
     // month-calendar view, or today otherwise.
     property date defaultDate: new Date()
+    // Which text field the shared date-picker popup should write its
+    // result into (dueField or startDateField) - set right before opening it.
+    property var activeDateField: null
 
     signal createTask(string calendarHref, string summary, var due, string description, string location)
     signal createEvent(string calendarHref, string summary, var start, var end, bool allDay, string description, string location)
@@ -191,6 +194,15 @@ QQC2.Popup {
                 Layout.preferredWidth: Kirigami.Units.gridUnit * 6
                 placeholderText: popup.dateHint + i18n(" (optional)")
             }
+            QQC2.ToolButton {
+                icon.name: "view-calendar"
+                onClicked: {
+                    popup.activeDateField = dueField;
+                    datePicker.openFor(popup.parseDateField(dueField.text.trim()) || popup.defaultDate);
+                }
+                QQC2.ToolTip.text: i18n("Pick a date")
+                QQC2.ToolTip.visible: hovered
+            }
         }
 
         RowLayout {
@@ -207,11 +219,30 @@ QQC2.Popup {
                 Layout.preferredWidth: Kirigami.Units.gridUnit * 6
                 placeholderText: popup.dateHint
             }
+            QQC2.ToolButton {
+                icon.name: "view-calendar"
+                onClicked: {
+                    popup.activeDateField = startDateField;
+                    datePicker.openFor(popup.parseDateField(startDateField.text.trim()) || popup.defaultDate);
+                }
+                QQC2.ToolTip.text: i18n("Pick a date")
+                QQC2.ToolTip.visible: hovered
+            }
             QQC2.TextField {
                 id: startTimeField
                 visible: !allDayCheck.checked
                 Layout.preferredWidth: Kirigami.Units.gridUnit * 4
                 placeholderText: "HH:MM"
+            }
+            QQC2.ToolButton {
+                visible: !allDayCheck.checked
+                icon.name: "clock"
+                onClicked: {
+                    var t = popup.parseTimeField(startTimeField.text.trim());
+                    timePicker.openFor(t ? t.hours : undefined, t ? t.minutes : undefined);
+                }
+                QQC2.ToolTip.text: i18n("Pick a time")
+                QQC2.ToolTip.visible: hovered
             }
             QQC2.Label {
                 visible: !allDayCheck.checked
@@ -245,6 +276,11 @@ QQC2.Popup {
                 id: descriptionField
                 wrapMode: TextEdit.Wrap
                 placeholderText: i18n("Description (optional)")
+                // Sonnet spellcheck flags any word outside the active
+                // dictionary (e.g. non-English text) in red with an
+                // underline, which reads as a rendering bug in a field
+                // that's just free-form notes - disable it here.
+                Kirigami.SpellCheck.enabled: false
             }
         }
 
@@ -281,6 +317,22 @@ QQC2.Popup {
                 enabled: titleField.text.trim().length > 0 && (popup.editMode || popup.activeCalendars.length > 0)
                 onClicked: popup.submit()
             }
+        }
+    }
+
+    DatePickerPopup {
+        id: datePicker
+        parent: popup.parent
+        onPicked: (day) => {
+            if (popup.activeDateField) popup.activeDateField.text = popup.formatDateField(day);
+        }
+    }
+
+    TimePickerPopup {
+        id: timePicker
+        parent: popup.parent
+        onPicked: (hours, minutes) => {
+            startTimeField.text = popup.pad(hours) + ":" + popup.pad(minutes);
         }
     }
 
