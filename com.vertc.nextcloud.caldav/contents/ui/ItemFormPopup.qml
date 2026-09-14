@@ -42,13 +42,15 @@ QQC2.Popup {
     // Prefilled start/due date for a new item: the day selected in the
     // month-calendar view, or today otherwise.
     property date defaultDate: new Date()
-    // Which text field the shared date-picker popup should write its
-    // result into (dueField or startDateField) - set right before opening it.
+    // Which text field the shared date-picker/time-picker popup should
+    // write its result into (dueField/startDateField, dueTimeField/
+    // startTimeField) - set right before opening the relevant picker.
     property var activeDateField: null
+    property var activeTimeField: null
 
-    signal createTask(string calendarHref, string summary, var due, string description, string location)
+    signal createTask(string calendarHref, string summary, var due, bool dueHasTime, string description, string location)
     signal createEvent(string calendarHref, string summary, var start, var end, bool allDay, string description, string location)
-    signal saveTask(var task, string summary, var due, string description, string location)
+    signal saveTask(var task, string summary, var due, bool dueHasTime, string description, string location)
     signal saveEvent(var event, string summary, var start, var end, bool allDay, string description, string location)
     signal removeItem(var item, bool isTask)
 
@@ -88,6 +90,7 @@ QQC2.Popup {
         titleField.text = "";
         var text = popup.formatDateField(popup.defaultDate);
         dueField.text = "";
+        dueTimeField.text = "";
         startDateField.text = text;
         startTimeField.text = "";
         allDayCheck.checked = false;
@@ -109,6 +112,7 @@ QQC2.Popup {
         locationField.text = item.location || "";
         if (taskFlag) {
             dueField.text = item.due ? popup.formatDateField(item.due) : "";
+            dueTimeField.text = (item.due && !item.dueAllDay) ? popup.formatTimeField(item.due) : "";
         } else {
             allDayCheck.checked = !!item.allDay;
             startDateField.text = item.dtstart ? popup.formatDateField(item.dtstart) : "";
@@ -195,12 +199,27 @@ QQC2.Popup {
                 placeholderText: popup.dateHint + i18n(" (optional)")
             }
             QQC2.ToolButton {
-                icon.name: "view-calendar"
+                icon.name: "x-office-calendar"
                 onClicked: {
                     popup.activeDateField = dueField;
                     datePicker.openFor(popup.parseDateField(dueField.text.trim()) || popup.defaultDate);
                 }
                 QQC2.ToolTip.text: i18n("Pick a date")
+                QQC2.ToolTip.visible: hovered
+            }
+            QQC2.TextField {
+                id: dueTimeField
+                Layout.preferredWidth: Kirigami.Units.gridUnit * 4
+                placeholderText: "HH:MM"
+            }
+            QQC2.ToolButton {
+                icon.name: "clock"
+                onClicked: {
+                    popup.activeTimeField = dueTimeField;
+                    var t = popup.parseTimeField(dueTimeField.text.trim());
+                    timePicker.openFor(t ? t.hours : undefined, t ? t.minutes : undefined);
+                }
+                QQC2.ToolTip.text: i18n("Pick a time")
                 QQC2.ToolTip.visible: hovered
             }
         }
@@ -220,7 +239,7 @@ QQC2.Popup {
                 placeholderText: popup.dateHint
             }
             QQC2.ToolButton {
-                icon.name: "view-calendar"
+                icon.name: "x-office-calendar"
                 onClicked: {
                     popup.activeDateField = startDateField;
                     datePicker.openFor(popup.parseDateField(startDateField.text.trim()) || popup.defaultDate);
@@ -238,6 +257,7 @@ QQC2.Popup {
                 visible: !allDayCheck.checked
                 icon.name: "clock"
                 onClicked: {
+                    popup.activeTimeField = startTimeField;
                     var t = popup.parseTimeField(startTimeField.text.trim());
                     timePicker.openFor(t ? t.hours : undefined, t ? t.minutes : undefined);
                 }
@@ -332,7 +352,7 @@ QQC2.Popup {
         id: timePicker
         parent: popup.parent
         onPicked: (hours, minutes) => {
-            startTimeField.text = popup.pad(hours) + ":" + popup.pad(minutes);
+            if (popup.activeTimeField) popup.activeTimeField.text = popup.pad(hours) + ":" + popup.pad(minutes);
         }
     }
 
@@ -382,13 +402,21 @@ QQC2.Popup {
 
         if (popup.isTask) {
             var due = null;
+            var dueHasTime = false;
             var dueText = dueField.text.trim();
             if (dueText !== "") {
                 due = parseDateField(dueText);
                 if (!due) { localError = i18n("Due date must be in %1 form.", popup.dateHint); return; }
+                var dueTimeText = dueTimeField.text.trim();
+                if (dueTimeText !== "") {
+                    var dueTime = parseTimeField(dueTimeText);
+                    if (!dueTime) { localError = i18n("Due time must be in HH:MM form."); return; }
+                    due = new Date(due.getFullYear(), due.getMonth(), due.getDate(), dueTime.hours, dueTime.minutes);
+                    dueHasTime = true;
+                }
             }
-            if (popup.editMode) popup.saveTask(popup.editingItem, summary, due, description, location);
-            else popup.createTask(cal.href, summary, due, description, location);
+            if (popup.editMode) popup.saveTask(popup.editingItem, summary, due, dueHasTime, description, location);
+            else popup.createTask(cal.href, summary, due, dueHasTime, description, location);
         } else {
             var startDateText = startDateField.text.trim();
             var startDate = parseDateField(startDateText);

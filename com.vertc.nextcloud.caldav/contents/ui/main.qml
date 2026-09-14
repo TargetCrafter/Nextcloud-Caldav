@@ -127,9 +127,9 @@ PlasmoidItem {
         onToggleTaskCollapseRequested: root.toggleTaskCollapse(uid)
         onToggleRecentlyClosedRequested: root.toggleRecentlyClosedExpanded()
         onOpenConfigureRequested: plasmoid.internalAction("configure").trigger()
-        onCreateTaskRequested: root.createTask(calendarHref, summary, due, description, location)
+        onCreateTaskRequested: root.createTask(calendarHref, summary, due, dueHasTime, description, location)
         onCreateEventRequested: root.createEvent(calendarHref, summary, start, end, allDay, description, location)
-        onEditTaskRequested: root.updateTask(task, summary, due, description, location)
+        onEditTaskRequested: root.updateTask(task, summary, due, dueHasTime, description, location)
         onEditEventRequested: root.updateEvent(event, summary, start, end, allDay, description, location)
         onDeleteTaskRequested: root.deleteTask(task)
         onDeleteEventRequested: root.deleteEvent(event)
@@ -240,7 +240,7 @@ PlasmoidItem {
     }
 
     Component.onCompleted: {
-        console.log("Nextcloud Caldav: build 0.5.20 starting");
+        console.log("Nextcloud Caldav: build 0.5.21 starting");
         refresh();
         if (plasmoid.configuration.viewMode === 1 /* Month */) refreshMonth(monthCursor);
     }
@@ -808,9 +808,9 @@ PlasmoidItem {
             });
     }
 
-    function updateTask(task, summary, due, description, location) {
+    function updateTask(task, summary, due, dueHasTime, description, location) {
         formError = "";
-        var icsText = ICAL.patchTodoFields(task, { summary: summary, due: due || null, description: description, location: location });
+        var icsText = ICAL.patchTodoFields(task, { summary: summary, due: due || null, dueHasTime: !!dueHasTime, description: description, location: location });
         CalDAV.updateResource(plasmoid.configuration.serverUrl, plasmoid.configuration.username,
             plasmoid.configuration.appPassword, task.href, task.etag, icsText,
             function (err) {
@@ -884,10 +884,10 @@ PlasmoidItem {
             });
     }
 
-    function createTask(calendarHref, summary, due, description, location) {
+    function createTask(calendarHref, summary, due, dueHasTime, description, location) {
         formError = "";
         var uid = ICAL.generateUid();
-        var icsText = ICAL.buildVTodoIcs({ uid: uid, summary: summary, due: due || null, description: description, location: location, parentUid: null });
+        var icsText = ICAL.buildVTodoIcs({ uid: uid, summary: summary, due: due || null, dueHasTime: !!dueHasTime, description: description, location: location, parentUid: null });
         CalDAV.createResource(plasmoid.configuration.serverUrl, plasmoid.configuration.username,
             plasmoid.configuration.appPassword, calendarHref, uid, icsText,
             function (err) {
