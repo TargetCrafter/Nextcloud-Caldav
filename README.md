@@ -199,8 +199,9 @@ To remove it: `kpackagetool6 --type Plasma/Applet --remove com.vertc.nextcloud.c
 - Creating, editing, and deleting events/tasks is supported via a popup
   form (hover an item for the edit icon, or use the "+" button to create
   one), with title, calendar, due/start date+time, description, and
-  location fields. Date/time entry is plain text fields following your
-  system's date order, not a picker widget. Creating a task as a subtask
+  location fields. Dates and the event start time can be typed directly
+  (following your system's date order) or picked from a small calendar/time
+  popup next to each field. Creating a task as a subtask
   of another isn't exposed in the UI (only reading and indenting existing
   subtasks is).
 - **Recurring events can't be edited or deleted from the widget** - only
