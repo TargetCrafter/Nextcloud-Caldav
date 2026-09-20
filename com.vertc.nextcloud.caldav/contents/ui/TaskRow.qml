@@ -123,6 +123,14 @@ Item {
         // matching how orderTasksWithHierarchy/groupRootOf already treat it.
         PlasmaComponents3.ToolButton {
             visible: hover.hovered && delegate.depth === 0
+            // Pinned to the same compact size as the collapse-arrow button
+            // further down, rather than this ToolButton's own (taller)
+            // implicit size - otherwise the row's height - and every
+            // other row's position below it - would grow the moment this
+            // button appeared on hover, then shrink back when it left,
+            // visibly jumping.
+            Layout.preferredWidth: Kirigami.Units.iconSizes.small + Kirigami.Units.smallSpacing
+            Layout.preferredHeight: Layout.preferredWidth
             icon.name: "list-add"
             onClicked: delegate.addSubtaskRequested()
             PlasmaComponents3.ToolTip.text: i18n("Add subtask…")
@@ -131,6 +139,9 @@ Item {
 
         PlasmaComponents3.ToolButton {
             visible: hover.hovered
+            // See the add-subtask button above for why.
+            Layout.preferredWidth: Kirigami.Units.iconSizes.small + Kirigami.Units.smallSpacing
+            Layout.preferredHeight: Layout.preferredWidth
             icon.name: "document-edit"
             onClicked: delegate.editRequested()
             PlasmaComponents3.ToolTip.text: i18n("Edit…")
