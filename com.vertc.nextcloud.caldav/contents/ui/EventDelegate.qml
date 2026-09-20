@@ -37,8 +37,10 @@ Item {
     Rectangle {
         anchors.fill: parent
         radius: Kirigami.Units.cornerRadius
+        // Hovered opacity is well short of 1 - see TaskFamilyCard.qml's
+        // matching card background for why.
         color: hover.hovered ? Kirigami.Theme.hoverColor : Kirigami.Theme.alternateBackgroundColor
-        opacity: hover.hovered ? 1 : 0.35
+        opacity: hover.hovered ? 0.5 : 0.35
     }
 
     RowLayout {

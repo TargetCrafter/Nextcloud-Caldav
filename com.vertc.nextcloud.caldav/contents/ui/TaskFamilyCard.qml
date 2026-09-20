@@ -42,9 +42,12 @@ Item {
         radius: Kirigami.Units.cornerRadius
         // Matches EventDelegate's card background - the calendar-color
         // accent bar below is what now tells tasks and events apart, the
-        // same way it already does between different calendars.
+        // same way it already does between different calendars. Hovered
+        // opacity is well short of 1 - Theme.hoverColor at full strength
+        // was saturated enough to make the row's own text hard to read
+        // against it.
         color: hover.hovered ? Kirigami.Theme.hoverColor : Kirigami.Theme.alternateBackgroundColor
-        opacity: hover.hovered ? 1 : 0.35
+        opacity: hover.hovered ? 0.5 : 0.35
     }
 
     // The one bar for this whole family - spans the card's full height, so

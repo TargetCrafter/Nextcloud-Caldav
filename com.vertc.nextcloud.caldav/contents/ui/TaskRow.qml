@@ -43,7 +43,11 @@ Item {
         visible: hover.hovered
         radius: Kirigami.Units.cornerRadius
         color: Kirigami.Theme.hoverColor
-        opacity: 0.6
+        // Sits on top of the card's own (now already-hovered) background -
+        // see TaskFamilyCard.qml - so this only needs to be a faint extra
+        // tint pointing at the specific row under the pointer, not another
+        // full-strength layer of hoverColor stacked on top of that one.
+        opacity: 0.25
     }
 
     RowLayout {
