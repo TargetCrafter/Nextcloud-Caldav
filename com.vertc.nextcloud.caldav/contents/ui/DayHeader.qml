@@ -19,11 +19,17 @@ RowLayout {
     // just labels over content that's always there).
     property bool expandable: false
     property bool expanded: true
+    // Non-zero only for a task's own nested "Recently closed" mini-section
+    // (see main.qml's orderTasksWithHierarchy) - indents it to line up
+    // under its parent task, the same depth TaskDelegate itself uses for
+    // subtask rows.
+    property int depth: 0
     signal toggleRequested()
 
     Layout.fillWidth: true
     Layout.topMargin: Kirigami.Units.smallSpacing
     Layout.bottomMargin: Kirigami.Units.smallSpacing / 2
+    Layout.leftMargin: depth * Kirigami.Units.gridUnit
     spacing: Kirigami.Units.smallSpacing
 
     Kirigami.Icon {
@@ -37,7 +43,7 @@ RowLayout {
     PlasmaComponents3.Label {
         Layout.fillWidth: true
         font.bold: true
-        font.pointSize: Kirigami.Theme.defaultFont.pointSize
+        font.pointSize: header.depth > 0 ? Kirigami.Theme.smallFont.pointSize : Kirigami.Theme.defaultFont.pointSize
         color: header.label === "overdue" ? Kirigami.Theme.negativeTextColor : Kirigami.Theme.disabledTextColor
         text: header.text()
 

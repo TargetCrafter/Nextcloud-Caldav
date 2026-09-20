@@ -237,6 +237,7 @@ Item {
                         case "dayHeader": return dayHeaderComponent;
                         case "sectionHeader": return dayHeaderComponent;
                         case "recentlyClosedHeader": return dayHeaderComponent;
+                        case "subtaskRecentlyClosedHeader": return dayHeaderComponent;
                         case "event": return eventComponent;
                         case "task": return taskComponent;
                         default: return null;
@@ -355,8 +356,10 @@ Item {
         id: dayHeaderComponent
         DayHeader {
             date: parent.itemData.type === "dayHeader" ? parent.itemData.date : new Date()
-            label: parent.itemData.type === "sectionHeader" || parent.itemData.type === "recentlyClosedHeader" ? parent.itemData.label : ""
+            label: parent.itemData.type === "sectionHeader" || parent.itemData.type === "recentlyClosedHeader" || parent.itemData.type === "subtaskRecentlyClosedHeader"
+                   ? parent.itemData.label : ""
             count: parent.itemData.count || 0
+            depth: parent.itemData.depth || 0
             expandable: parent.itemData.type === "recentlyClosedHeader"
             expanded: !!parent.itemData.expanded
             onToggleRequested: fullRep.toggleRecentlyClosedRequested()
