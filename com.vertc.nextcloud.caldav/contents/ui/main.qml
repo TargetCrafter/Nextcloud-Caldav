@@ -240,7 +240,7 @@ PlasmoidItem {
     }
 
     Component.onCompleted: {
-        console.log("Nextcloud Caldav: build 0.5.24 starting");
+        console.log("Nextcloud Caldav: build 0.5.25 starting");
         refresh();
         if (plasmoid.configuration.viewMode === 1 /* Month */) refreshMonth(monthCursor);
     }
@@ -468,14 +468,33 @@ PlasmoidItem {
     // treated as top-level here, there's no sensible parent to attach it
     // to.
     //
-    // Also stamps `childCount` (every descendant, not just direct
-    // children - that's the number a collapsed task hides) and `collapsed`
-    // on each task that has children, from the persisted
-    // collapsedTaskUids config (see toggleTaskCollapse). A collapsed
-    // task's own row is still included in `out` - only its descendants are
-    // left out entirely, not just visually hidden, so TaskDelegate never
-    // has to know why a row isn't there.
-    function orderTasksWithHierarchy(tasks) {
+    // Also stamps `childCount` (every descendant, active or recently-closed
+    // - not just direct children - that's the number a collapsed task
+    // hides) and `collapsed` on each task that has children, from the
+    // persisted collapsedTaskUids config (see toggleTaskCollapse). A
+    // collapsed task's own row is still included in `out` - only its
+    // descendants are left out entirely, not just visually hidden, so
+    // TaskDelegate never has to know why a row isn't there.
+    //
+    // Returns agendaItems-shaped {type, ...} entries directly (not bare
+    // task objects) so a task's own recently-closed subtasks - passed in
+    // via `closedSubtasksByParent` (see rebuildAgendaSections) - can be
+    // interleaved right after its active children as a nested "Recently
+    // closed" mini-section, capped the same way the flat one is.
+    function orderTasksWithHierarchy(tasks, closedSubtasksByParent) {
+        // With "Show completed tasks" on, `tasks` can itself already
+        // contain the very subtasks `closedSubtasksByParent` claims for a
+        // nested mini-section below - strip those out here so each one
+        // renders exactly once (in its mini-section), never also mixed in
+        // with its parent's active children.
+        if (closedSubtasksByParent) {
+            var claimedUids = {};
+            Object.keys(closedSubtasksByParent).forEach(function (uid) {
+                closedSubtasksByParent[uid].forEach(function (t) { if (t.uid) claimedUids[t.uid] = true; });
+            });
+            tasks = tasks.filter(function (t) { return !claimedUids[t.uid]; });
+        }
+
         var byUid = {};
         tasks.forEach(function (t) { if (t.uid) byUid[t.uid] = t; });
         var childrenOf = {};
@@ -501,9 +520,12 @@ PlasmoidItem {
         Object.keys(childrenOf).forEach(function (uid) { childrenOf[uid].sort(byDue); });
 
         var collapsedUids = plasmoid.configuration.collapsedTaskUids;
+        function closedCountOf(uid) {
+            return (closedSubtasksByParent && closedSubtasksByParent[uid]) ? closedSubtasksByParent[uid].length : 0;
+        }
         function countDescendants(t) {
             var kids = childrenOf[t.uid] || [];
-            var count = kids.length;
+            var count = kids.length + closedCountOf(t.uid);
             kids.forEach(function (c) { count += countDescendants(c); });
             return count;
         }
@@ -513,9 +535,20 @@ PlasmoidItem {
             t.depth = depth;
             t.childCount = countDescendants(t);
             t.collapsed = t.childCount > 0 && collapsedUids.indexOf(t.uid) !== -1;
-            out.push(t);
+            out.push({ type: "task", data: t });
             if (t.collapsed) return;
             (childrenOf[t.uid] || []).forEach(function (c) { visit(c, depth + 1); });
+
+            var closed = ((closedSubtasksByParent && closedSubtasksByParent[t.uid]) || []).slice(0, 10);
+            if (closed.length > 0) {
+                out.push({ type: "subtaskRecentlyClosedHeader", label: "recentlyClosed", count: closed.length, depth: depth + 1 });
+                closed.forEach(function (c) {
+                    c.depth = depth + 1;
+                    c.childCount = 0;
+                    c.collapsed = false;
+                    out.push({ type: "task", data: c });
+                });
+            }
         }
         roots.forEach(function (t) { visit(t, 0); });
         return out;
@@ -624,6 +657,30 @@ PlasmoidItem {
         var todoByUid = {};
         todos.forEach(function (t) { if (t.uid) todoByUid[t.uid] = t; });
 
+        // Completed subtasks, grouped by their (still-present) parent -
+        // each parent gets its own small "Recently closed" mini-section
+        // right under its active subtasks (see orderTasksWithHierarchy)
+        // instead of only showing up in the single flat "Recently closed"
+        // section below, which excludes anything claimed here (see its own
+        // filter further down). Always pulled from allTodos, like the flat
+        // section, so a subtask can still be found and reopened with "Show
+        // completed tasks" off. A subtask whose parent is itself completed
+        // and hidden (so missing from todoByUid) falls back to the flat
+        // section instead - same "parent no longer around" fallback
+        // groupRootOf/pruneCollapsedTaskUids already use.
+        var closedSubtasksByParent = {};
+        allTodos.forEach(function (t) {
+            if (t.status !== "COMPLETED" || !t.parentUid || !todoByUid[t.parentUid]) return;
+            (closedSubtasksByParent[t.parentUid] = closedSubtasksByParent[t.parentUid] || []).push(t);
+        });
+        Object.keys(closedSubtasksByParent).forEach(function (uid) {
+            closedSubtasksByParent[uid].sort(function (a, b) {
+                var at = a.completed ? a.completed.getTime() : -Infinity;
+                var bt = b.completed ? b.completed.getTime() : -Infinity;
+                return bt - at;
+            });
+        });
+
         var overdue = todos.filter(function (t) {
             var g = groupRootOf(todoByUid, t);
             return g.due && g.status !== "COMPLETED" && DateUtils.isOverdue(g.due, now);
@@ -655,7 +712,7 @@ PlasmoidItem {
                 return groupRootOf(todoByUid, a).due.getTime() - groupRootOf(todoByUid, b).due.getTime();
             });
             out.push({ type: "sectionHeader", label: "overdue", count: overdue.length });
-            orderTasksWithHierarchy(overdue).forEach(function (t) { out.push({ type: "task", data: t }); });
+            orderTasksWithHierarchy(overdue, closedSubtasksByParent).forEach(function (item) { out.push(item); });
         }
 
         var start = DateUtils.startOfDay(now);
@@ -670,7 +727,7 @@ PlasmoidItem {
             if (dayEvents.length === 0 && dayTasks.length === 0) continue;
             out.push({ type: "dayHeader", date: d });
             dayEvents.forEach(function (e) { out.push({ type: "event", data: e }); });
-            orderTasksWithHierarchy(dayTasks).forEach(function (t) { out.push({ type: "task", data: t }); });
+            orderTasksWithHierarchy(dayTasks, closedSubtasksByParent).forEach(function (item) { out.push(item); });
         }
 
         // A task due further out than the "Show events up to" window (e.g.
@@ -692,25 +749,31 @@ PlasmoidItem {
                     return groupRootOf(todoByUid, a).due.getTime() - groupRootOf(todoByUid, b).due.getTime();
                 });
                 out.push({ type: "sectionHeader", label: "dueLater", count: later.length });
-                orderTasksWithHierarchy(later).forEach(function (t) { out.push({ type: "task", data: t }); });
+                orderTasksWithHierarchy(later, closedSubtasksByParent).forEach(function (item) { out.push(item); });
             }
         }
 
         if (showTasks && noDue.length > 0) {
             noDue.sort(function (a, b) { return priorityRank(a) - priorityRank(b); });
             out.push({ type: "sectionHeader", label: "noDueDate", count: noDue.length });
-            orderTasksWithHierarchy(noDue).forEach(function (t) { out.push({ type: "task", data: t }); });
+            orderTasksWithHierarchy(noDue, closedSubtasksByParent).forEach(function (item) { out.push(item); });
         }
 
-        // "Recently closed": the most recently completed tasks, always
-        // pulled from allTodos (not the showCompleted-filtered `todos`
-        // above) so this works as a way to find and re-open one even with
-        // "Show completed tasks" off. Flat and un-nested on purpose - it's
-        // a recent-activity list, not a hierarchy - and folded away by
-        // default (see recentlyClosedExpanded), since it's an occasional
-        // undo tool, not something to keep in view.
+        // "Recently closed": the most recently completed top-level tasks,
+        // always pulled from allTodos (not the showCompleted-filtered
+        // `todos` above) so this works as a way to find and re-open one
+        // even with "Show completed tasks" off. Flat and un-nested on
+        // purpose - it's a recent-activity list, not a hierarchy - and
+        // folded away by default (see recentlyClosedExpanded), since it's
+        // an occasional undo tool, not something to keep in view. A
+        // completed subtask whose parent is still around is excluded here
+        // - it already has its own nested mini-section right under that
+        // parent (see closedSubtasksByParent above), so it isn't shown
+        // twice.
         if (showTasks) {
-            var recentlyClosed = allTodos.filter(function (t) { return t.status === "COMPLETED"; });
+            var recentlyClosed = allTodos.filter(function (t) {
+                return t.status === "COMPLETED" && !(t.parentUid && todoByUid[t.parentUid]);
+            });
             recentlyClosed.sort(function (a, b) {
                 var at = a.completed ? a.completed.getTime() : -Infinity;
                 var bt = b.completed ? b.completed.getTime() : -Infinity;
