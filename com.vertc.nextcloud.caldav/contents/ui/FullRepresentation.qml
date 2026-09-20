@@ -180,7 +180,11 @@ Item {
             PlasmaComponents3.ToolButton {
                 icon.name: "list-add"
                 onClicked: itemFormPopup.openForCreate()
-                PlasmaComponents3.ToolTip.text: i18n("Add event or task…")
+                PlasmaComponents3.ToolTip.text: {
+                    if (fullRep.addLockedType === "event") return i18n("Add event…");
+                    if (fullRep.addLockedType === "task") return i18n("Add task…");
+                    return i18n("Add event or task…");
+                }
                 PlasmaComponents3.ToolTip.visible: hovered
             }
 
