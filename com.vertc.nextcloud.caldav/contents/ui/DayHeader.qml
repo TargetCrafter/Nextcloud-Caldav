@@ -68,6 +68,7 @@ RowLayout {
 
     function text() {
         if (label === "overdue") return i18np("Overdue (%1)", "Overdue (%1)", count);
+        if (label === "dueLater") return i18n("Due later");
         if (label === "noDueDate") return i18n("No due date");
         if (label === "recentlyClosed") return i18np("Recently closed (%1)", "Recently closed (%1)", count);
 

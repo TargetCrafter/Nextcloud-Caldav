@@ -22,10 +22,12 @@ file or with `kpackagetool6`.
   containing "Sprint Shootout")
 - Events grouped by day ("Today", "Tomorrow", weekday names), with
   recurring events expanded server-side
-- Tasks (VTODO) grouped into Overdue / due-today / due-later / no due date,
-  with a checkbox to mark them done directly from the widget, and subtasks
-  (linked via `RELATED-TO`, e.g. from Nextcloud Tasks, or created directly
-  from a task's own "+" button) shown indented under their parent
+- Tasks (VTODO) grouped into Overdue / due-today / due-on-a-later-day (within
+  the look-ahead window) / due later still (beyond the window - tasks aren't
+  range-limited by that setting the way events are) / no due date, with a
+  checkbox to mark them done directly from the widget, and subtasks (linked
+  via `RELATED-TO`, e.g. from Nextcloud Tasks, or created directly from a
+  task's own "+" button) shown indented under their parent
 - A popup form for adding, editing, or deleting events and tasks (single,
   non-recurring events only for editing/deleting), with title, calendar,
   due/start date+time, description, and location fields
