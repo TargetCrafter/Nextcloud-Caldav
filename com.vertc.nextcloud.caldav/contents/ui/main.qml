@@ -242,7 +242,7 @@ PlasmoidItem {
     }
 
     Component.onCompleted: {
-        console.log("Nextcloud Caldav: build 0.5.34 starting");
+        console.log("Nextcloud Caldav: build 0.5.35 starting");
         refresh();
         if (plasmoid.configuration.viewMode === 1 /* Month */) refreshMonth(monthCursor);
     }
@@ -460,6 +460,16 @@ PlasmoidItem {
         return task.priority > 0 ? task.priority : 10;
     }
 
+    // Shared by orderTasksWithHierarchy and the "Recently completed"
+    // section below - orders a list of sibling subtasks by due date,
+    // undated ones last.
+    function byDueDate(a, b) {
+        if (!a.due && !b.due) return 0;
+        if (!a.due) return 1;
+        if (!b.due) return -1;
+        return a.due.getTime() - b.due.getTime();
+    }
+
     // Re-orders an already-sorted list of tasks so a subtask (parentUid
     // pointing at another task's uid) immediately follows its parent,
     // recursively, and stamps a `depth` (0 = top-level) used for visual
@@ -521,13 +531,7 @@ PlasmoidItem {
         // due date (see groupRootOf in finishRefresh), so it's this sort -
         // not bucket placement - that puts a parent's subtasks in due-date
         // order underneath it. Undated subtasks sort after dated ones.
-        function byDue(a, b) {
-            if (!a.due && !b.due) return 0;
-            if (!a.due) return 1;
-            if (!b.due) return -1;
-            return a.due.getTime() - b.due.getTime();
-        }
-        Object.keys(childrenOf).forEach(function (uid) { childrenOf[uid].sort(byDue); });
+        Object.keys(childrenOf).forEach(function (uid) { childrenOf[uid].sort(byDueDate); });
 
         var collapsedUids = plasmoid.configuration.collapsedTaskUids;
         function closedCountOf(uid) {
@@ -657,7 +661,7 @@ PlasmoidItem {
     }
 
     // Same instant, no-refetch pattern as toggleTaskCollapse above, for the
-    // single "Recently closed" section.
+    // single "Recently completed" section.
     function toggleRecentlyClosedExpanded() {
         plasmoid.configuration.recentlyClosedExpanded = !plasmoid.configuration.recentlyClosedExpanded;
         rebuildAgendaSections();
@@ -787,16 +791,17 @@ PlasmoidItem {
             orderTasksWithHierarchy(noDue, closedSubtasksByParent).forEach(function (item) { out.push(item); });
         }
 
-        // "Recently closed": the most recently completed top-level tasks,
-        // always pulled from allTodos (not the showCompleted-filtered
-        // `todos` above) so this works as a way to find and re-open one
-        // even with "Show completed tasks" off. Flat and un-nested on
-        // purpose - it's a recent-activity list, not a hierarchy - and
-        // folded away by default (see recentlyClosedExpanded), since it's
-        // an occasional undo tool, not something to keep in view. A
-        // completed subtask whose parent is still around is excluded here
+        // "Recently completed": the most recently completed top-level
+        // tasks, always pulled from allTodos (not the showCompleted-
+        // filtered `todos` above) so this works as a way to find and
+        // reopen one even with "Show completed tasks" off. Folded away by
+        // default (see recentlyClosedExpanded), since it's an occasional
+        // undo tool, not something to keep in view. A completed subtask
+        // whose parent is still around is excluded here as its own entry
         // - it already renders indented right under that parent (see
-        // closedSubtasksByParent above), so it isn't shown twice.
+        // closedSubtasksByParent above) - but still shows up as a row
+        // under its parent's own entry here, same as everywhere else, if
+        // that parent is itself recently completed.
         if (showTasks) {
             var recentlyClosed = allTodos.filter(function (t) {
                 return t.status === "COMPLETED" && !(t.parentUid && todoByUid[t.parentUid]);
@@ -808,6 +813,15 @@ PlasmoidItem {
             });
             recentlyClosed = recentlyClosed.slice(0, 10);
             if (recentlyClosed.length > 0) {
+                // Every direct child of any task, completed or not, from
+                // allTodos rather than the showCompleted-filtered `todos` -
+                // same "works even with Show completed tasks off" reason
+                // as `recentlyClosed` itself above.
+                var childrenOfAny = {};
+                allTodos.forEach(function (t) {
+                    if (t.parentUid) (childrenOfAny[t.parentUid] = childrenOfAny[t.parentUid] || []).push(t);
+                });
+
                 var recentlyClosedExpanded = plasmoid.configuration.recentlyClosedExpanded;
                 out.push({ type: "recentlyClosedHeader", label: "recentlyClosed", count: recentlyClosed.length, expanded: recentlyClosedExpanded });
                 if (recentlyClosedExpanded) {
@@ -815,15 +829,21 @@ PlasmoidItem {
                         // Reset any depth/childCount/collapsed stamped on
                         // this same task object by an earlier
                         // orderTasksWithHierarchy pass this cycle (e.g. if
-                        // "Show completed tasks" is also on) - this section
-                        // is flat and un-nested, never a group root. Wrapped
-                        // as a single-row taskFamily (empty rows) so it
-                        // renders through the same TaskFamilyCard as every
-                        // other task instead of needing its own delegate.
+                        // "Show completed tasks" is also on).
                         t.depth = 0;
                         t.childCount = 0;
                         t.collapsed = false;
-                        out.push({ type: "taskFamily", root: t, rows: [] });
+                        var rows = (childrenOfAny[t.uid] || []).slice().sort(byDueDate).map(function (c) {
+                            c.depth = 1;
+                            c.childCount = 0;
+                            c.collapsed = false;
+                            return { kind: "task", data: c };
+                        });
+                        // showCompletedDate: unique to this section - a
+                        // completed task's own due date isn't usually why
+                        // it's here, when it was finished is, so its row
+                        // shows that instead (see TaskRow.qml).
+                        out.push({ type: "taskFamily", root: t, rows: rows, showCompletedDate: true });
                     });
                 }
             }

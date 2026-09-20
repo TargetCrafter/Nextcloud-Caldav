@@ -28,6 +28,12 @@ Item {
     // meaningful (childCount > 0) on a task that actually has subtasks.
     readonly property int childCount: taskData.childCount || 0
     readonly property bool collapsed: !!taskData.collapsed
+    // Set by main.qml's "Recently completed" section only - there, a
+    // completed task's own due date isn't why it's in that list, when it
+    // was finished is, so its row shows that instead of (or alongside)
+    // any due date, the same way every other completed task in that
+    // section does.
+    property bool showCompletedDate: false
 
     implicitHeight: row.implicitHeight + Kirigami.Units.mediumSpacing * 2
 
@@ -66,19 +72,33 @@ Item {
             Layout.alignment: Qt.AlignVCenter
         }
 
-        PlasmaComponents3.Label {
-            // The calendar-color accent bar already identifies which
-            // calendar this is, the same way it does for events - a
-            // separate calendar-name line was redundant.
+        ColumnLayout {
             Layout.fillWidth: true
-            elide: Text.ElideRight
-            font.strikeout: delegate.completed
-            font.pointSize: delegate.depth > 0 ? Kirigami.Theme.smallFont.pointSize : Kirigami.Theme.defaultFont.pointSize
-            opacity: delegate.completed ? 0.6 : 1
-            // See EventDelegate.qml's summary Label for why this must be
-            // plain text: this renders a server-supplied task summary.
-            textFormat: Text.PlainText
-            text: delegate.taskData.summary || i18n("(No title)")
+            spacing: 0
+
+            PlasmaComponents3.Label {
+                // The calendar-color accent bar already identifies which
+                // calendar this is, the same way it does for events - a
+                // separate calendar-name line was redundant.
+                Layout.fillWidth: true
+                elide: Text.ElideRight
+                font.strikeout: delegate.completed
+                font.pointSize: delegate.depth > 0 ? Kirigami.Theme.smallFont.pointSize : Kirigami.Theme.defaultFont.pointSize
+                opacity: delegate.completed ? 0.6 : 1
+                // See EventDelegate.qml's summary Label for why this must be
+                // plain text: this renders a server-supplied task summary.
+                textFormat: Text.PlainText
+                text: delegate.taskData.summary || i18n("(No title)")
+            }
+
+            PlasmaComponents3.Label {
+                Layout.fillWidth: true
+                visible: delegate.showCompletedDate && delegate.completed && !!delegate.taskData.completed
+                elide: Text.ElideRight
+                opacity: 0.6
+                font.pointSize: Kirigami.Theme.smallFont.pointSize
+                text: visible ? i18n("Completed %1", delegate.formatCompletedDate(delegate.taskData.completed)) : ""
+            }
         }
 
         // Positioned right after the (fillWidth) summary Label and before
@@ -139,5 +159,10 @@ Item {
             Layout.preferredWidth: Kirigami.Units.iconSizes.small
             Layout.preferredHeight: Kirigami.Units.iconSizes.small
         }
+    }
+
+    function formatCompletedDate(d) {
+        return Qt.formatDate(d, "d MMM") + ", " +
+               Qt.formatTime(d, plasmoid.configuration.use24HourClock ? "HH:mm" : "h:mm AP");
     }
 }

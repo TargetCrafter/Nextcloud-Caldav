@@ -25,6 +25,9 @@ Item {
     // [{ kind: "task", data } | { kind: "closedHeader", label, count, depth, color }],
     // in visual order - see main.qml's orderTasksWithHierarchy.
     property var rows: []
+    // Set only by main.qml's "Recently completed" section - see
+    // TaskRow.qml's own showCompletedDate for what this does.
+    property bool showCompletedDate: false
 
     signal toggled(var task)
     signal editRequested(var task)
@@ -73,6 +76,7 @@ Item {
         TaskRow {
             width: column.width
             taskData: card.root
+            showCompletedDate: card.showCompletedDate
             onToggled: card.toggled(card.root)
             onEditRequested: card.editRequested(card.root)
             onAddSubtaskRequested: card.addSubtaskRequested(card.root)
@@ -94,6 +98,7 @@ Item {
         id: taskRowComponent
         TaskRow {
             taskData: parent.rowData.data
+            showCompletedDate: card.showCompletedDate
             onToggled: card.toggled(parent.rowData.data)
             onEditRequested: card.editRequested(parent.rowData.data)
             onAddSubtaskRequested: card.addSubtaskRequested(parent.rowData.data)

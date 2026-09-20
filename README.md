@@ -30,11 +30,12 @@ file or with `kpackagetool6`.
   task's own "+" button) shown indented under their parent behind one
   continuous calendar-color bar running the whole task-plus-subtasks
   family, so it reads as one group at a glance. A folded-away "Recently
-  closed" section (click to expand) lists the last few tasks completed
-  overall, as a quick way to find and reopen one - a completed subtask
-  instead shows up under its own parent task, behind a small "Completed"
-  heading indented to match (part of that same family bar), so it isn't
-  also duplicated in the general list
+  completed" section (click to expand) lists the last few top-level tasks
+  completed overall, each with its own subtasks shown underneath and its
+  completion date/time in place of a due date, as a quick way to find and
+  reopen one - a completed subtask instead shows up under its own parent
+  task, behind a small "Completed" heading indented to match (part of
+  that same family bar), so it isn't also duplicated in the general list
 - A popup form for adding, editing, or deleting events and tasks (single,
   non-recurring events only for editing/deleting), with title, calendar,
   due/start date+time, description, and location fields
