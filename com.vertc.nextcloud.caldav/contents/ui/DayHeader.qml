@@ -19,11 +19,18 @@ RowLayout {
     // just labels over content that's always there).
     property bool expandable: false
     property bool expanded: true
+    // Non-zero only for a task's own nested "Recently closed" subtask
+    // heading (see main.qml's orderTasksWithHierarchy) - indents it to
+    // roughly the same depth TaskDelegate itself uses for subtask rows,
+    // so it reads as belonging to that task rather than as its own
+    // top-level section.
+    property int depth: 0
     signal toggleRequested()
 
     Layout.fillWidth: true
     Layout.topMargin: Kirigami.Units.smallSpacing
     Layout.bottomMargin: Kirigami.Units.smallSpacing / 2
+    Layout.leftMargin: depth > 0 ? Kirigami.Units.mediumSpacing + depth * Kirigami.Units.gridUnit : 0
     spacing: Kirigami.Units.smallSpacing
 
     Kirigami.Icon {
@@ -37,7 +44,7 @@ RowLayout {
     PlasmaComponents3.Label {
         Layout.fillWidth: true
         font.bold: true
-        font.pointSize: Kirigami.Theme.defaultFont.pointSize
+        font.pointSize: header.depth > 0 ? Kirigami.Theme.smallFont.pointSize : Kirigami.Theme.defaultFont.pointSize
         color: header.label === "overdue" ? Kirigami.Theme.negativeTextColor : Kirigami.Theme.disabledTextColor
         text: header.text()
 
@@ -50,6 +57,10 @@ RowLayout {
     }
 
     Kirigami.Separator {
+        // Skipped on a nested (depth > 0) heading - it's just a small
+        // label under its own task there, not a full section header with
+        // something trailing it (an arrow, on the expandable ones).
+        visible: header.depth === 0
         Layout.fillWidth: true
         Layout.alignment: Qt.AlignVCenter
         opacity: 0.5
