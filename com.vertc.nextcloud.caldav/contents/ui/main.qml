@@ -240,7 +240,7 @@ PlasmoidItem {
     }
 
     Component.onCompleted: {
-        console.log("Nextcloud Caldav: build 0.5.23 starting");
+        console.log("Nextcloud Caldav: build 0.5.24 starting");
         refresh();
         if (plasmoid.configuration.viewMode === 1 /* Month */) refreshMonth(monthCursor);
     }
@@ -660,15 +660,40 @@ PlasmoidItem {
 
         var start = DateUtils.startOfDay(now);
         var daysAhead = plasmoid.configuration.daysAhead;
+        var consumedDueDayKeys = {};
         for (var i = 0; i < daysAhead; i++) {
             var d = DateUtils.addDays(start, i);
             var key = DateUtils.dayKey(d);
+            consumedDueDayKeys[key] = true;
             var dayEvents = (eventsByDay[key] || []).slice().sort(sortEvents);
             var dayTasks = (dueByDay[key] || []).slice().sort(function (a, b) { return priorityRank(a) - priorityRank(b); });
             if (dayEvents.length === 0 && dayTasks.length === 0) continue;
             out.push({ type: "dayHeader", date: d });
             dayEvents.forEach(function (e) { out.push({ type: "event", data: e }); });
             orderTasksWithHierarchy(dayTasks).forEach(function (t) { out.push({ type: "task", data: t }); });
+        }
+
+        // A task due further out than the "Show events up to" window (e.g.
+        // due next month while the window is 14 days) is still fetched in
+        // full - fetchTodos never range-limits VTODOs like events are - but
+        // the day-by-day loop above only ever visits `daysAhead` days, so
+        // without this its due-date bucket would just never be visited and
+        // the task would silently vanish from the list entirely instead of
+        // landing in "No due date" or anywhere else. Group every such
+        // leftover bucket into one "Due later" section instead, nearest
+        // due date first.
+        if (showTasks) {
+            var later = [];
+            Object.keys(dueByDay).forEach(function (dayKey) {
+                if (!consumedDueDayKeys[dayKey]) later = later.concat(dueByDay[dayKey]);
+            });
+            if (later.length > 0) {
+                later.sort(function (a, b) {
+                    return groupRootOf(todoByUid, a).due.getTime() - groupRootOf(todoByUid, b).due.getTime();
+                });
+                out.push({ type: "sectionHeader", label: "dueLater", count: later.length });
+                orderTasksWithHierarchy(later).forEach(function (t) { out.push({ type: "task", data: t }); });
+            }
         }
 
         if (showTasks && noDue.length > 0) {
