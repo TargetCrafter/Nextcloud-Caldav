@@ -35,6 +35,11 @@ QQC2.Popup {
     // restricted to a single display mode (see main.xml's displayMode), so
     // there's nothing to switch between and the tab row is just noise.
     property string lockedType: ""
+    // Set (create mode only) when this popup was opened via a task's "+"
+    // subtask button - forces task type, skips the calendar picker (a
+    // subtask always goes in its parent's own calendar/task list), and
+    // gets tagged with RELATED-TO on save.
+    property var parentTask: null
 
     // [{ href, name, color, kinds }]
     property var calendars: []
@@ -48,7 +53,7 @@ QQC2.Popup {
     property var activeDateField: null
     property var activeTimeField: null
 
-    signal createTask(string calendarHref, string summary, var due, bool dueHasTime, string description, string location)
+    signal createTask(string calendarHref, string summary, var due, bool dueHasTime, string description, string location, string parentUid)
     signal createEvent(string calendarHref, string summary, var start, var end, bool allDay, string description, string location)
     signal saveTask(var task, string summary, var due, bool dueHasTime, string description, string location)
     signal saveEvent(var event, string summary, var start, var end, bool allDay, string description, string location)
@@ -79,13 +84,15 @@ QQC2.Popup {
         }
     }
 
-    function openForCreate() {
+    function openForCreate(parentTask) {
         popup.editMode = false;
         popup.editingItem = null;
+        popup.parentTask = parentTask || null;
         localError = "";
         confirmingDelete = false;
         confirmTimer.stop();
-        if (popup.lockedType === "task") popup.isTask = true;
+        if (popup.parentTask) popup.isTask = true;
+        else if (popup.lockedType === "task") popup.isTask = true;
         else if (popup.lockedType === "event") popup.isTask = false;
         titleField.text = "";
         var text = popup.formatDateField(popup.defaultDate);
@@ -103,6 +110,7 @@ QQC2.Popup {
     function openForEdit(item, taskFlag) {
         popup.editMode = true;
         popup.editingItem = item;
+        popup.parentTask = null;
         popup.isTask = taskFlag;
         localError = "";
         confirmingDelete = false;
@@ -145,6 +153,7 @@ QQC2.Popup {
                 font.bold: true
                 text: {
                     if (popup.editMode) return popup.isTask ? i18n("Edit task") : i18n("Edit event");
+                    if (popup.parentTask) return i18n("New subtask");
                     return popup.isTask ? i18n("New task") : i18n("New event");
                 }
             }
@@ -159,7 +168,7 @@ QQC2.Popup {
 
         PlasmaComponents3.TabBar {
             id: typeBar
-            visible: !popup.editMode && popup.lockedType === ""
+            visible: !popup.editMode && popup.lockedType === "" && !popup.parentTask
             Layout.fillWidth: false
             // TabBar splits its own width evenly between tabs; left to its
             // implicit width it ends up too narrow for "Event", wrapping
@@ -182,9 +191,21 @@ QQC2.Popup {
         QQC2.ComboBox {
             id: calendarCombo
             Layout.fillWidth: true
-            visible: !popup.editMode
+            visible: !popup.editMode && !popup.parentTask
             model: popup.activeCalendars.map(function (c) { return c.name; })
             enabled: popup.activeCalendars.length > 0
+        }
+
+        QQC2.Label {
+            Layout.fillWidth: true
+            visible: !popup.editMode && !!popup.parentTask
+            elide: Text.ElideRight
+            opacity: 0.7
+            // Renders another task's server-supplied summary - see
+            // EventDelegate.qml's summary Label for why this must stay
+            // plain text.
+            textFormat: Text.PlainText
+            text: i18n("Subtask of: %1", popup.parentTask ? (popup.parentTask.summary || i18n("(No title)")) : "")
         }
 
         RowLayout {
@@ -334,7 +355,7 @@ QQC2.Popup {
 
             QQC2.Button {
                 text: popup.editMode ? i18n("Save") : i18n("Add")
-                enabled: titleField.text.trim().length > 0 && (popup.editMode || popup.activeCalendars.length > 0)
+                enabled: titleField.text.trim().length > 0 && (popup.editMode || popup.parentTask || popup.activeCalendars.length > 0)
                 onClicked: popup.submit()
             }
         }
@@ -395,7 +416,7 @@ QQC2.Popup {
         var location = locationField.text.trim();
 
         var cal = null;
-        if (!popup.editMode) {
+        if (!popup.editMode && !popup.parentTask) {
             cal = popup.activeCalendars[calendarCombo.currentIndex];
             if (!cal) { localError = i18n("Pick a calendar first."); return; }
         }
@@ -415,8 +436,12 @@ QQC2.Popup {
                     dueHasTime = true;
                 }
             }
-            if (popup.editMode) popup.saveTask(popup.editingItem, summary, due, dueHasTime, description, location);
-            else popup.createTask(cal.href, summary, due, dueHasTime, description, location);
+            if (popup.editMode) {
+                popup.saveTask(popup.editingItem, summary, due, dueHasTime, description, location);
+            } else {
+                var calendarHref = popup.parentTask ? popup.parentTask.calendarHref : cal.href;
+                popup.createTask(calendarHref, summary, due, dueHasTime, description, location, popup.parentTask ? popup.parentTask.uid : "");
+            }
         } else {
             var startDateText = startDateField.text.trim();
             var startDate = parseDateField(startDateText);

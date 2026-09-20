@@ -9,6 +9,7 @@ Item {
     required property var taskData
     signal toggled()
     signal editRequested()
+    signal addSubtaskRequested()
     signal toggleCollapseRequested()
 
     readonly property bool completed: taskData.status === "COMPLETED"
@@ -91,12 +92,25 @@ Item {
         }
 
         // Positioned right after the (fillWidth) summary Label and before
-        // every other fixed-width item in this row on purpose: this button
-        // only appearing on hover shrinks the summary Label by exactly its
-        // own width when it does, which leaves everything after it - the
-        // subtask badge/arrow, the priority icon - at the same on-screen
-        // position either way. Putting it anywhere past those would instead
-        // have made *them* jump left/right every time the row was hovered.
+        // every other fixed-width item in this row on purpose: these
+        // buttons only appearing on hover shrink the summary Label by
+        // exactly their own width when they do, which leaves everything
+        // after them - the subtask badge/arrow, the priority icon - at the
+        // same on-screen position either way. Putting them anywhere past
+        // those would instead have made *them* jump left/right every time
+        // the row was hovered.
+        //
+        // Only offered on a top-level task (depth 0), not on a subtask
+        // itself - this app's hierarchy is intentionally one level deep,
+        // matching how orderTasksWithHierarchy/groupRootOf already treat it.
+        PlasmaComponents3.ToolButton {
+            visible: hover.hovered && delegate.depth === 0
+            icon.name: "list-add"
+            onClicked: delegate.addSubtaskRequested()
+            PlasmaComponents3.ToolTip.text: i18n("Add subtask…")
+            PlasmaComponents3.ToolTip.visible: hovered
+        }
+
         PlasmaComponents3.ToolButton {
             visible: hover.hovered
             icon.name: "document-edit"
