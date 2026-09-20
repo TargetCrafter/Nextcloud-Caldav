@@ -75,6 +75,7 @@ Item {
         spacing: Kirigami.Units.smallSpacing
 
         PlasmaComponents3.CheckBox {
+            id: completeCheck
             checked: delegate.completed
             onToggled: delegate.toggled()
             Layout.alignment: Qt.AlignVCenter
@@ -123,14 +124,17 @@ Item {
         // matching how orderTasksWithHierarchy/groupRootOf already treat it.
         PlasmaComponents3.ToolButton {
             visible: hover.hovered && delegate.depth === 0
-            // Pinned to the same compact size as the collapse-arrow button
-            // further down, rather than this ToolButton's own (taller)
-            // implicit size - otherwise the row's height - and every
-            // other row's position below it - would grow the moment this
-            // button appeared on hover, then shrink back when it left,
+            // Pinned to the checkbox's own natural height, not this
+            // ToolButton's own (taller) implicit size or some separately
+            // guessed constant - the checkbox is always present, so this
+            // guarantees the button can never exceed the row's own
+            // already-established baseline height, whatever that
+            // actually is on this theme. Otherwise the row's height - and
+            // every other row's position below it - grows the moment this
+            // button appears on hover, then shrinks back when it leaves,
             // visibly jumping.
             Layout.preferredWidth: Kirigami.Units.iconSizes.small + Kirigami.Units.smallSpacing
-            Layout.preferredHeight: Layout.preferredWidth
+            Layout.preferredHeight: completeCheck.implicitHeight
             icon.name: "list-add"
             onClicked: delegate.addSubtaskRequested()
             PlasmaComponents3.ToolTip.text: i18n("Add subtask…")
@@ -141,7 +145,7 @@ Item {
             visible: hover.hovered
             // See the add-subtask button above for why.
             Layout.preferredWidth: Kirigami.Units.iconSizes.small + Kirigami.Units.smallSpacing
-            Layout.preferredHeight: Layout.preferredWidth
+            Layout.preferredHeight: completeCheck.implicitHeight
             icon.name: "document-edit"
             onClicked: delegate.editRequested()
             PlasmaComponents3.ToolTip.text: i18n("Edit…")
