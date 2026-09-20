@@ -32,9 +32,9 @@ file or with `kpackagetool6`.
   family, so it reads as one group at a glance. A folded-away "Recently
   closed" section (click to expand) lists the last few tasks completed
   overall, as a quick way to find and reopen one - a completed subtask
-  instead shows up under its own parent task, behind a small "Recently
-  closed" heading indented to match (part of that same family bar), so
-  it isn't also duplicated in the general list
+  instead shows up under its own parent task, behind a small "Completed"
+  heading indented to match (part of that same family bar), so it isn't
+  also duplicated in the general list
 - A popup form for adding, editing, or deleting events and tasks (single,
   non-recurring events only for editing/deleting), with title, calendar,
   due/start date+time, description, and location fields

@@ -4,7 +4,7 @@ import org.kde.plasma.components as PlasmaComponents3
 import org.kde.kirigami as Kirigami
 
 // A task and everything that visually belongs to it - its active
-// subtasks, and its own "Recently closed" subtask heading + rows - as one
+// subtasks, and its own "Completed" subtask heading + rows - as one
 // card: one shared background, one shared accent bar spanning the card's
 // full height, and a plain Column (not a Layout - a Layout combined with
 // a Repeater is what broke the very first attempt at this) stacking each
@@ -12,7 +12,7 @@ import org.kde.kirigami as Kirigami
 // one-row card.
 //
 // Replaces the earlier approach of giving every row (task, subtask,
-// "Recently closed" heading) its own independent accent bar and trying to
+// "Completed" heading) its own independent accent bar and trying to
 // make them line up pixel-perfect with their neighbors to read as one
 // continuous line - which left visible gaps (and, since a row's height
 // could differ from its neighbor's, bars of inconsistent length) across
@@ -121,7 +121,7 @@ Item {
                 font.bold: true
                 font.pointSize: Kirigami.Theme.smallFont.pointSize
                 color: Kirigami.Theme.disabledTextColor
-                text: i18np("Recently closed (%1)", "Recently closed (%1)", header.rowData.count)
+                text: i18np("Completed (%1)", "Completed (%1)", header.rowData.count)
             }
         }
     }
