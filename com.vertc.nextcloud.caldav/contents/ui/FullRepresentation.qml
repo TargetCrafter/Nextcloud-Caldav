@@ -68,7 +68,7 @@ Item {
     signal toggleTaskCollapseRequested(string uid)
     signal toggleRecentlyClosedRequested()
     signal openConfigureRequested()
-    signal createTaskRequested(string calendarHref, string summary, var due, bool dueHasTime, string description, string location)
+    signal createTaskRequested(string calendarHref, string summary, var due, bool dueHasTime, string description, string location, string parentUid)
     signal createEventRequested(string calendarHref, string summary, var start, var end, bool allDay, string description, string location)
     signal editTaskRequested(var task, string summary, var due, bool dueHasTime, string description, string location)
     signal editEventRequested(var event, string summary, var start, var end, bool allDay, string description, string location)
@@ -386,6 +386,7 @@ Item {
             taskData: parent.itemData.data
             onToggled: fullRep.toggleTask(parent.itemData.data)
             onEditRequested: itemFormPopup.openForEdit(parent.itemData.data, true)
+            onAddSubtaskRequested: itemFormPopup.openForCreate(parent.itemData.data)
             onToggleCollapseRequested: fullRep.toggleTaskCollapseRequested(parent.itemData.data.uid)
         }
     }
@@ -397,7 +398,7 @@ Item {
         lockedType: fullRep.addLockedType
         defaultDate: fullRep.selectedDate
         externalError: fullRep.formError
-        onCreateTask: fullRep.createTaskRequested(calendarHref, summary, due, dueHasTime, description, location)
+        onCreateTask: fullRep.createTaskRequested(calendarHref, summary, due, dueHasTime, description, location, parentUid)
         onCreateEvent: fullRep.createEventRequested(calendarHref, summary, start, end, allDay, description, location)
         onSaveTask: fullRep.editTaskRequested(task, summary, due, dueHasTime, description, location)
         onSaveEvent: fullRep.editEventRequested(event, summary, start, end, allDay, description, location)

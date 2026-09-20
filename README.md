@@ -24,8 +24,8 @@ file or with `kpackagetool6`.
   recurring events expanded server-side
 - Tasks (VTODO) grouped into Overdue / due-today / due-later / no due date,
   with a checkbox to mark them done directly from the widget, and subtasks
-  (linked via `RELATED-TO`, e.g. from Nextcloud Tasks) shown indented under
-  their parent
+  (linked via `RELATED-TO`, e.g. from Nextcloud Tasks, or created directly
+  from a task's own "+" button) shown indented under their parent
 - A popup form for adding, editing, or deleting events and tasks (single,
   non-recurring events only for editing/deleting), with title, calendar,
   due/start date+time, description, and location fields
@@ -203,9 +203,10 @@ To remove it: `kpackagetool6 --type Plasma/Applet --remove com.vertc.nextcloud.c
   time can all be typed directly (following your system's date order) or
   picked from a small calendar/time popup next to each field - a task's due
   time is optional, so a task can still be given just a due date with no
-  time of day. Creating a task as a subtask
-  of another isn't exposed in the UI (only reading and indenting existing
-  subtasks is).
+  time of day. Hovering a top-level task also shows a "+" button (next to
+  the edit icon) to add a subtask under it directly, in the same calendar/
+  task list as its parent - subtasks are one level deep, so a subtask
+  doesn't get its own "+" button.
 - **Recurring events can't be edited or deleted from the widget** - only
   single, non-recurring events get the edit icon. Which occurrence(s) an
   edit or delete should apply to (this one, this and future, or the whole

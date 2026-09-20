@@ -127,7 +127,7 @@ PlasmoidItem {
         onToggleTaskCollapseRequested: root.toggleTaskCollapse(uid)
         onToggleRecentlyClosedRequested: root.toggleRecentlyClosedExpanded()
         onOpenConfigureRequested: plasmoid.internalAction("configure").trigger()
-        onCreateTaskRequested: root.createTask(calendarHref, summary, due, dueHasTime, description, location)
+        onCreateTaskRequested: root.createTask(calendarHref, summary, due, dueHasTime, description, location, parentUid)
         onCreateEventRequested: root.createEvent(calendarHref, summary, start, end, allDay, description, location)
         onEditTaskRequested: root.updateTask(task, summary, due, dueHasTime, description, location)
         onEditEventRequested: root.updateEvent(event, summary, start, end, allDay, description, location)
@@ -240,7 +240,7 @@ PlasmoidItem {
     }
 
     Component.onCompleted: {
-        console.log("Nextcloud Caldav: build 0.5.21 starting");
+        console.log("Nextcloud Caldav: build 0.5.22 starting");
         refresh();
         if (plasmoid.configuration.viewMode === 1 /* Month */) refreshMonth(monthCursor);
     }
@@ -884,10 +884,10 @@ PlasmoidItem {
             });
     }
 
-    function createTask(calendarHref, summary, due, dueHasTime, description, location) {
+    function createTask(calendarHref, summary, due, dueHasTime, description, location, parentUid) {
         formError = "";
         var uid = ICAL.generateUid();
-        var icsText = ICAL.buildVTodoIcs({ uid: uid, summary: summary, due: due || null, dueHasTime: !!dueHasTime, description: description, location: location, parentUid: null });
+        var icsText = ICAL.buildVTodoIcs({ uid: uid, summary: summary, due: due || null, dueHasTime: !!dueHasTime, description: description, location: location, parentUid: parentUid || null });
         CalDAV.createResource(plasmoid.configuration.serverUrl, plasmoid.configuration.username,
             plasmoid.configuration.appPassword, calendarHref, uid, icsText,
             function (err) {
