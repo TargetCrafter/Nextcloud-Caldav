@@ -13,7 +13,9 @@ PlasmoidItem {
     // Flat, pre-grouped render list consumed by FullRepresentation:
     // { type: "sectionHeader", label, count } |
     // { type: "dayHeader", date } |
-    // { type: "event", data } | { type: "task", data }
+    // { type: "recentlyClosedHeader", label, count, expanded } |
+    // { type: "event", data } |
+    // { type: "taskFamily", root, rows } - see orderTasksWithHierarchy
     property var agendaItems: []
     property var nextEvent: null
     property int todayCount: 0
@@ -240,7 +242,7 @@ PlasmoidItem {
     }
 
     Component.onCompleted: {
-        console.log("Nextcloud Caldav: build 0.5.31 starting");
+        console.log("Nextcloud Caldav: build 0.5.32 starting");
         refresh();
         if (plasmoid.configuration.viewMode === 1 /* Month */) refreshMonth(monthCursor);
     }
@@ -472,16 +474,22 @@ PlasmoidItem {
     // - not just direct children - that's the number a collapsed task
     // hides) and `collapsed` on each task that has children, from the
     // persisted collapsedTaskUids config (see toggleTaskCollapse). A
-    // collapsed task's own row is still included in `out` - only its
-    // descendants are left out entirely, not just visually hidden, so
-    // TaskDelegate never has to know why a row isn't there.
+    // collapsed task's own row is still included - only its descendants
+    // are left out of `rows` entirely, not just visually hidden, so
+    // TaskFamilyCard never has to know why a row isn't there.
     //
-    // Returns agendaItems-shaped {type, ...} entries directly (not bare
-    // task objects) so a task's own recently-completed subtasks - passed
-    // in via `closedSubtasksByParent` (see rebuildAgendaSections) - can be
-    // interleaved right after its active children behind their own small
-    // "Recently closed" heading, capped and most-recent-first the same
-    // way the flat "Recently closed" section is.
+    // Returns one agendaItems-shaped {type: "taskFamily", root, rows} entry
+    // per top-level task, rather than a separate entry per row - a task
+    // and everything that visually belongs to it (its active subtasks, and
+    // its own recently-completed subtasks behind a small "Recently closed"
+    // heading, most-recent-first and capped the same way the flat
+    // "Recently closed" section is) render together as one card with one
+    // shared accent bar (see TaskFamilyCard.qml), instead of each row
+    // trying to independently line its own bar segment up with its
+    // neighbors' to read as continuous. `rows` holds everything under the
+    // root in visual order: {kind: "task", data} for a subtask/closed
+    // subtask, {kind: "closedHeader", label, count, depth, color} for a
+    // "Recently closed" heading.
     function orderTasksWithHierarchy(tasks, closedSubtasksByParent) {
         // With "Show completed tasks" on, `tasks` can itself already
         // contain the very subtasks `closedSubtasksByParent` claims below
@@ -532,27 +540,41 @@ PlasmoidItem {
             return count;
         }
 
-        var out = [];
-        function visit(t, depth) {
-            t.depth = depth;
-            t.childCount = countDescendants(t);
-            t.collapsed = t.childCount > 0 && collapsedUids.indexOf(t.uid) !== -1;
-            out.push({ type: "task", data: t });
-            if (t.collapsed) return;
-            (childrenOf[t.uid] || []).forEach(function (c) { visit(c, depth + 1); });
+        // Appends everything under `t` (subtasks, recursively, and t's own
+        // "Recently closed" subtask heading + rows) to `rows`, at `depth`
+        // (t's own depth + 1 for t's direct children). Never called for a
+        // collapsed task - its descendants are left out entirely, not just
+        // visually hidden, same as the old flat layout.
+        function appendRows(t, depth, rows) {
+            (childrenOf[t.uid] || []).forEach(function (c) {
+                c.depth = depth;
+                c.childCount = countDescendants(c);
+                c.collapsed = c.childCount > 0 && collapsedUids.indexOf(c.uid) !== -1;
+                rows.push({ kind: "task", data: c });
+                if (!c.collapsed) appendRows(c, depth + 1, rows);
+            });
 
             var closed = ((closedSubtasksByParent && closedSubtasksByParent[t.uid]) || []).slice(0, 10);
             if (closed.length > 0) {
-                out.push({ type: "subtaskRecentlyClosedHeader", label: "recentlyClosed", count: closed.length, depth: depth + 1, color: t.calendarColor });
+                rows.push({ kind: "closedHeader", label: "recentlyClosed", count: closed.length, depth: depth, color: t.calendarColor });
                 closed.forEach(function (c) {
-                    c.depth = depth + 1;
+                    c.depth = depth;
                     c.childCount = 0;
                     c.collapsed = false;
-                    out.push({ type: "task", data: c });
+                    rows.push({ kind: "task", data: c });
                 });
             }
         }
-        roots.forEach(function (t) { visit(t, 0); });
+
+        var out = [];
+        roots.forEach(function (t) {
+            t.depth = 0;
+            t.childCount = countDescendants(t);
+            t.collapsed = t.childCount > 0 && collapsedUids.indexOf(t.uid) !== -1;
+            var rows = [];
+            if (!t.collapsed) appendRows(t, 1, rows);
+            out.push({ type: "taskFamily", root: t, rows: rows });
+        });
         return out;
     }
 
@@ -794,11 +816,14 @@ PlasmoidItem {
                         // this same task object by an earlier
                         // orderTasksWithHierarchy pass this cycle (e.g. if
                         // "Show completed tasks" is also on) - this section
-                        // is flat and un-nested, never a group root.
+                        // is flat and un-nested, never a group root. Wrapped
+                        // as a single-row taskFamily (empty rows) so it
+                        // renders through the same TaskFamilyCard as every
+                        // other task instead of needing its own delegate.
                         t.depth = 0;
                         t.childCount = 0;
                         t.collapsed = false;
-                        out.push({ type: "task", data: t });
+                        out.push({ type: "taskFamily", root: t, rows: [] });
                     });
                 }
             }

@@ -3,6 +3,14 @@ import QtQuick.Layouts
 import org.kde.plasma.components as PlasmaComponents3
 import org.kde.kirigami as Kirigami
 
+// A single task or subtask line inside a TaskFamilyCard (see
+// TaskFamilyCard.qml) - just the checkbox/title/buttons row, indented by
+// its own depth. Deliberately has no accent bar and no background of its
+// own: the card around it draws one shared bar and one shared background
+// for the whole family (a task plus its subtasks and its own "Recently
+// closed" subtask rows), so they read as one card instead of independent
+// rows that have to line up pixel-perfect with their neighbors to look
+// continuous - which repeatedly failed to look right in practice.
 Item {
     id: delegate
 
@@ -21,77 +29,31 @@ Item {
     readonly property int childCount: taskData.childCount || 0
     readonly property bool collapsed: !!taskData.collapsed
 
-    // Zero for a subtask (or a "Recently closed" subtask row) - it's a
-    // continuation of its parent's family, and agendaList's own spacing is
-    // 0 (see FullRepresentation.qml), so it sits flush against the row
-    // above with no inter-item gap to bridge. Non-zero only for a row that
-    // starts a new family (a top-level task), so there's still visible
-    // breathing room before it. This replaces the old approach of each row
-    // drawing its accent bar past its own edges into the ListView's
-    // between-item spacing - which left a visible seam depending on paint
-    // order - with a gap that's just ordinary content height, built into
-    // this row's own implicitHeight, so a continuing row's bar can start
-    // exactly where the previous row's bar ended.
-    readonly property real topGap: delegate.depth > 0 ? 0 : Kirigami.Units.smallSpacing
-
-    // See EventDelegate.qml for why this must match the row's own margins.
-    implicitHeight: topGap + row.implicitHeight + Kirigami.Units.mediumSpacing * 2
+    implicitHeight: row.implicitHeight + Kirigami.Units.mediumSpacing * 2
 
     HoverHandler {
         id: hover
     }
 
     Rectangle {
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.top: parent.top
-        anchors.topMargin: delegate.topGap
-        anchors.bottom: parent.bottom
+        // A light highlight only, not a full card background - the card's
+        // own background (see TaskFamilyCard.qml) already covers the
+        // whole family, so this row doesn't need one of its own.
+        anchors.fill: parent
+        visible: hover.hovered
         radius: Kirigami.Units.cornerRadius
-        // Matches EventDelegate's card background - the calendar-color
-        // accent bar below is what now tells tasks and events apart, the
-        // same way it already does between different calendars.
-        color: hover.hovered ? Kirigami.Theme.hoverColor : Kirigami.Theme.alternateBackgroundColor
-        opacity: hover.hovered ? 1 : 0.35
-    }
-
-    // Kept outside the indented RowLayout below and anchored at a fixed
-    // position, rather than as the row's first child - a subtask's deeper
-    // anchors.leftMargin would otherwise have shifted its own accent bar
-    // along with the rest of its content, leaving every task's bar at a
-    // different x instead of all lined up in a column.
-    //
-    // A subtask row (depth > 0) reaches its own top edge exactly (no
-    // topGap, see above), and a task with subtasks shown below it
-    // (childCount > 0 && !collapsed) reaches its own bottom edge exactly -
-    // and since the next row in either case sits flush against this one
-    // (agendaList.spacing is 0, and a continuing row's own topGap is 0),
-    // the two bars' edges land on the exact same y with nothing to bridge,
-    // so they read as one continuous line. DayHeader.qml's own accentBar
-    // (for a task's "Recently closed" subtask heading) works the same way.
-    Rectangle {
-        id: accentBar
-        anchors.left: parent.left
-        anchors.top: parent.top
-        anchors.bottom: parent.bottom
-        anchors.leftMargin: Kirigami.Units.mediumSpacing
-        anchors.topMargin: delegate.depth > 0 ? 0 : delegate.topGap + Kirigami.Units.mediumSpacing
-        anchors.bottomMargin: (delegate.childCount > 0 && !delegate.collapsed) ? 0 : Kirigami.Units.mediumSpacing
-        width: Kirigami.Units.smallSpacing * 0.6
-        radius: width / 2
-        color: delegate.taskData.calendarColor || Kirigami.Theme.highlightColor
+        color: Kirigami.Theme.hoverColor
+        opacity: 0.6
     }
 
     RowLayout {
         id: row
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.top: parent.top
-        anchors.topMargin: delegate.topGap + Kirigami.Units.mediumSpacing
-        anchors.bottomMargin: Kirigami.Units.mediumSpacing
-        anchors.rightMargin: Kirigami.Units.mediumSpacing
-        anchors.leftMargin: Kirigami.Units.mediumSpacing + accentBar.width + Kirigami.Units.smallSpacing +
+        anchors.verticalCenter: parent.verticalCenter
+        anchors.leftMargin: Kirigami.Units.mediumSpacing + Kirigami.Units.smallSpacing * 0.6 + Kirigami.Units.smallSpacing +
                              delegate.depth * Kirigami.Units.gridUnit
+        anchors.rightMargin: Kirigami.Units.mediumSpacing
         spacing: Kirigami.Units.smallSpacing
 
         PlasmaComponents3.CheckBox {
@@ -101,7 +63,7 @@ Item {
         }
 
         PlasmaComponents3.Label {
-            // The calendar-color accent bar above already identifies which
+            // The calendar-color accent bar already identifies which
             // calendar this is, the same way it does for events - a
             // separate calendar-name line was redundant.
             Layout.fillWidth: true

@@ -227,17 +227,7 @@ Item {
             ListView {
                 id: agendaList
                 model: fullRep.agendaItems
-                // 0, not Kirigami.Units.smallSpacing - each delegate now
-                // builds its own leading gap into its own implicitHeight
-                // instead (see TaskDelegate/DayHeader/EventDelegate's own
-                // topGap), so a subtask row can collapse its gap to zero
-                // and sit flush against the row above it for a genuinely
-                // unbroken accent bar. A gap contributed by the ListView
-                // itself, between two independently-loaded delegates,
-                // can't be selectively removed only for family members -
-                // this can, since it's just ordinary content height, not
-                // extra space the view inserts between them.
-                spacing: 0
+                spacing: Kirigami.Units.smallSpacing
                 boundsBehavior: Flickable.StopAtBounds
 
                 delegate: Loader {
@@ -247,9 +237,8 @@ Item {
                         case "dayHeader": return dayHeaderComponent;
                         case "sectionHeader": return dayHeaderComponent;
                         case "recentlyClosedHeader": return dayHeaderComponent;
-                        case "subtaskRecentlyClosedHeader": return dayHeaderComponent;
                         case "event": return eventComponent;
-                        case "task": return taskComponent;
+                        case "taskFamily": return taskFamilyComponent;
                         default: return null;
                         }
                     }
@@ -366,11 +355,9 @@ Item {
         id: dayHeaderComponent
         DayHeader {
             date: parent.itemData.type === "dayHeader" ? parent.itemData.date : new Date()
-            label: parent.itemData.type === "sectionHeader" || parent.itemData.type === "recentlyClosedHeader" || parent.itemData.type === "subtaskRecentlyClosedHeader"
+            label: parent.itemData.type === "sectionHeader" || parent.itemData.type === "recentlyClosedHeader"
                    ? parent.itemData.label : ""
             count: parent.itemData.count || 0
-            depth: parent.itemData.depth || 0
-            barColor: parent.itemData.color || Kirigami.Theme.highlightColor
             expandable: parent.itemData.type === "recentlyClosedHeader"
             expanded: !!parent.itemData.expanded
             onToggleRequested: fullRep.toggleRecentlyClosedRequested()
@@ -394,22 +381,19 @@ Item {
         EventDelegate {
             eventData: parent.itemData
             currentTime: fullRep.currentTime
-            // dayEventsList keeps its own non-zero ListView.spacing - see
-            // its declaration above - so this delegate must not also add
-            // its own leading gap, or the two would stack.
-            topGapEnabled: false
             onEditRequested: itemFormPopup.openForEdit(parent.itemData, false)
         }
     }
 
     Component {
-        id: taskComponent
-        TaskDelegate {
-            taskData: parent.itemData.data
-            onToggled: fullRep.toggleTask(parent.itemData.data)
-            onEditRequested: itemFormPopup.openForEdit(parent.itemData.data, true)
-            onAddSubtaskRequested: itemFormPopup.openForCreate(parent.itemData.data)
-            onToggleCollapseRequested: fullRep.toggleTaskCollapseRequested(parent.itemData.data.uid)
+        id: taskFamilyComponent
+        TaskFamilyCard {
+            root: parent.itemData.root
+            rows: parent.itemData.rows || []
+            onToggled: (task) => fullRep.toggleTask(task)
+            onEditRequested: (task) => itemFormPopup.openForEdit(task, true)
+            onAddSubtaskRequested: (task) => itemFormPopup.openForCreate(task)
+            onToggleCollapseRequested: (uid) => fullRep.toggleTaskCollapseRequested(uid)
         }
     }
 
