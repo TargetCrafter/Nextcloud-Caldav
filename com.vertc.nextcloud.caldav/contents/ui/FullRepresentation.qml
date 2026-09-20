@@ -390,6 +390,7 @@ Item {
         TaskFamilyCard {
             root: parent.itemData.root
             rows: parent.itemData.rows || []
+            showCompletedDate: !!parent.itemData.showCompletedDate
             onToggled: (task) => fullRep.toggleTask(task)
             onEditRequested: (task) => itemFormPopup.openForEdit(task, true)
             onAddSubtaskRequested: (task) => itemFormPopup.openForCreate(task)
