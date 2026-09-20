@@ -13,7 +13,8 @@ PlasmoidItem {
     // Flat, pre-grouped render list consumed by FullRepresentation:
     // { type: "sectionHeader", label, count } |
     // { type: "dayHeader", date } |
-    // { type: "event", data } | { type: "task", data }
+    // { type: "event", data } | { type: "task", data } |
+    // { type: "taskGroup", data: { root, children } } - see groupTaskFamilies
     property var agendaItems: []
     property var nextEvent: null
     property int todayCount: 0
@@ -126,7 +127,6 @@ PlasmoidItem {
         onToggleTask: root.toggleTaskCompletion(task)
         onToggleTaskCollapseRequested: root.toggleTaskCollapse(uid)
         onToggleRecentlyClosedRequested: root.toggleRecentlyClosedExpanded()
-        onToggleSubtaskRecentlyClosedRequested: root.toggleSubtaskRecentlyClosed(uid)
         onOpenConfigureRequested: plasmoid.internalAction("configure").trigger()
         onCreateTaskRequested: root.createTask(calendarHref, summary, due, dueHasTime, description, location, parentUid)
         onCreateEventRequested: root.createEvent(calendarHref, summary, start, end, allDay, description, location)
@@ -241,7 +241,7 @@ PlasmoidItem {
     }
 
     Component.onCompleted: {
-        console.log("Nextcloud Caldav: build 0.5.26 starting");
+        console.log("Nextcloud Caldav: build 0.5.27 starting");
         refresh();
         if (plasmoid.configuration.viewMode === 1 /* Month */) refreshMonth(monthCursor);
     }
@@ -478,19 +478,20 @@ PlasmoidItem {
     // TaskDelegate never has to know why a row isn't there.
     //
     // Returns agendaItems-shaped {type, ...} entries directly (not bare
-    // task objects) so a task's own recently-closed subtasks - passed in
-    // via `closedSubtasksByParent` (see rebuildAgendaSections) - can be
-    // interleaved right after its active children as a nested "Recently
-    // closed" mini-section, capped the same way the flat one is. Folded
-    // away by default, same as the flat section - `expandedSubtaskRecently
-    // ClosedUids` (see toggleSubtaskRecentlyClosed) says which parents'
-    // mini-sections are currently open.
-    function orderTasksWithHierarchy(tasks, closedSubtasksByParent, expandedSubtaskRecentlyClosedUids) {
+    // task objects) so a task's own recently-completed subtasks - passed
+    // in via `closedSubtasksByParent` (see rebuildAgendaSections) - can be
+    // interleaved right after its active children, capped the same way
+    // the flat "Recently closed" section is. Rendered as plain indented
+    // task rows (no separate header) - groupTaskFamilies further down
+    // wraps a task and everything pushed here under it into one visual
+    // family sharing a single accent bar.
+    function orderTasksWithHierarchy(tasks, closedSubtasksByParent) {
         // With "Show completed tasks" on, `tasks` can itself already
-        // contain the very subtasks `closedSubtasksByParent` claims for a
-        // nested mini-section below - strip those out here so each one
-        // renders exactly once (in its mini-section), never also mixed in
-        // with its parent's active children.
+        // contain the very subtasks `closedSubtasksByParent` claims below
+        // - strip those out here so each one renders exactly once (via
+        // closedSubtasksByParent, most-recently-completed first and capped
+        // at 10), never also mixed arbitrarily into its parent's active
+        // children by due date.
         if (closedSubtasksByParent) {
             var claimedUids = {};
             Object.keys(closedSubtasksByParent).forEach(function (uid) {
@@ -544,21 +545,12 @@ PlasmoidItem {
             (childrenOf[t.uid] || []).forEach(function (c) { visit(c, depth + 1); });
 
             var closed = ((closedSubtasksByParent && closedSubtasksByParent[t.uid]) || []).slice(0, 10);
-            if (closed.length > 0) {
-                var closedExpanded = expandedSubtaskRecentlyClosedUids && expandedSubtaskRecentlyClosedUids.indexOf(t.uid) !== -1;
-                out.push({
-                    type: "subtaskRecentlyClosedHeader", label: "recentlyClosed", count: closed.length,
-                    depth: depth + 1, expanded: closedExpanded, parentUid: t.uid, color: t.calendarColor
-                });
-                if (closedExpanded) {
-                    closed.forEach(function (c) {
-                        c.depth = depth + 1;
-                        c.childCount = 0;
-                        c.collapsed = false;
-                        out.push({ type: "task", data: c });
-                    });
-                }
-            }
+            closed.forEach(function (c) {
+                c.depth = depth + 1;
+                c.childCount = 0;
+                c.collapsed = false;
+                out.push({ type: "task", data: c });
+            });
         }
         roots.forEach(function (t) { visit(t, 0); });
         return out;
@@ -611,34 +603,23 @@ PlasmoidItem {
     }
 
     // Forgets a task's persisted fold state once it's no longer relevant -
-    // the task was deleted, or it no longer has any subtasks - so
-    // collapsedTaskUids doesn't grow to remember every task ever folded.
-    // Only runs on a clean, tasks-were-actually-fetched refresh: pruning
-    // against a partial/errored fetch, or against the forced-empty `todos`
-    // used when tasks aren't being shown at all, would wrongly wipe fold
-    // state that's still perfectly valid, just not checked this cycle.
-    //
-    // Also prunes expandedSubtaskRecentlyClosedUids the same way, once a
-    // parent no longer has any completed subtask of its own to show a
-    // mini-section for.
+    // the task was deleted, or it no longer has any subtasks (active or
+    // recently-completed - both count towards childCount, see
+    // orderTasksWithHierarchy) - so collapsedTaskUids doesn't grow to
+    // remember every task ever folded. Only runs on a clean,
+    // tasks-were-actually-fetched refresh: pruning against a
+    // partial/errored fetch, or against the forced-empty `todos` used when
+    // tasks aren't being shown at all, would wrongly wipe fold state
+    // that's still perfectly valid, just not checked this cycle.
     function pruneCollapsedTaskUids(todos, showTasks, err) {
         if (!showTasks || err) return;
         var todoByUid = {};
         todos.forEach(function (t) { if (t.uid) todoByUid[t.uid] = t; });
         var parentUidsWithChildren = {};
-        var parentUidsWithClosedChildren = {};
-        todos.forEach(function (t) {
-            if (!t.parentUid || !todoByUid[t.parentUid]) return;
-            parentUidsWithChildren[t.parentUid] = true;
-            if (t.status === "COMPLETED") parentUidsWithClosedChildren[t.parentUid] = true;
-        });
+        todos.forEach(function (t) { if (t.parentUid && todoByUid[t.parentUid]) parentUidsWithChildren[t.parentUid] = true; });
         var stored = plasmoid.configuration.collapsedTaskUids;
         var pruned = stored.filter(function (uid) { return parentUidsWithChildren[uid]; });
         if (pruned.length !== stored.length) plasmoid.configuration.collapsedTaskUids = pruned;
-
-        var storedExpanded = plasmoid.configuration.expandedSubtaskRecentlyClosedUids;
-        var prunedExpanded = storedExpanded.filter(function (uid) { return parentUidsWithClosedChildren[uid]; });
-        if (prunedExpanded.length !== storedExpanded.length) plasmoid.configuration.expandedSubtaskRecentlyClosedUids = prunedExpanded;
     }
 
     // Toggles whether a task's subtasks are folded away, and re-lays-out
@@ -657,16 +638,6 @@ PlasmoidItem {
     // single "Recently closed" section.
     function toggleRecentlyClosedExpanded() {
         plasmoid.configuration.recentlyClosedExpanded = !plasmoid.configuration.recentlyClosedExpanded;
-        rebuildAgendaSections();
-    }
-
-    // Same idea as toggleRecentlyClosedExpanded above, but per parent task,
-    // for that task's own nested "Recently closed" subtask mini-section.
-    function toggleSubtaskRecentlyClosed(uid) {
-        var list = plasmoid.configuration.expandedSubtaskRecentlyClosedUids.slice();
-        var idx = list.indexOf(uid);
-        if (idx === -1) list.push(uid); else list.splice(idx, 1);
-        plasmoid.configuration.expandedSubtaskRecentlyClosedUids = list;
         rebuildAgendaSections();
     }
 
@@ -691,16 +662,18 @@ PlasmoidItem {
         todos.forEach(function (t) { if (t.uid) todoByUid[t.uid] = t; });
 
         // Completed subtasks, grouped by their (still-present) parent -
-        // each parent gets its own small "Recently closed" mini-section
-        // right under its active subtasks (see orderTasksWithHierarchy)
-        // instead of only showing up in the single flat "Recently closed"
-        // section below, which excludes anything claimed here (see its own
-        // filter further down). Always pulled from allTodos, like the flat
-        // section, so a subtask can still be found and reopened with "Show
-        // completed tasks" off. A subtask whose parent is itself completed
-        // and hidden (so missing from todoByUid) falls back to the flat
-        // section instead - same "parent no longer around" fallback
-        // groupRootOf/pruneCollapsedTaskUids already use.
+        // each parent gets its own recently-completed subtasks rendered
+        // right after its active ones (see orderTasksWithHierarchy),
+        // capped and most-recent-first the same way the flat "Recently
+        // closed" section below is, instead of only showing up there
+        // mixed in with every other task's - the flat section excludes
+        // anything claimed here (see its own filter further down). Always
+        // pulled from allTodos, like the flat section, so a subtask can
+        // still be found and reopened with "Show completed tasks" off. A
+        // subtask whose parent is itself completed and hidden (so missing
+        // from todoByUid) falls back to the flat section instead - same
+        // "parent no longer around" fallback groupRootOf/
+        // pruneCollapsedTaskUids already use.
         var closedSubtasksByParent = {};
         allTodos.forEach(function (t) {
             if (t.status !== "COMPLETED" || !t.parentUid || !todoByUid[t.parentUid]) return;
@@ -713,7 +686,6 @@ PlasmoidItem {
                 return bt - at;
             });
         });
-        var expandedSubtaskRecentlyClosedUids = plasmoid.configuration.expandedSubtaskRecentlyClosedUids;
 
         var overdue = todos.filter(function (t) {
             var g = groupRootOf(todoByUid, t);
@@ -746,7 +718,7 @@ PlasmoidItem {
                 return groupRootOf(todoByUid, a).due.getTime() - groupRootOf(todoByUid, b).due.getTime();
             });
             out.push({ type: "sectionHeader", label: "overdue", count: overdue.length });
-            orderTasksWithHierarchy(overdue, closedSubtasksByParent, expandedSubtaskRecentlyClosedUids).forEach(function (item) { out.push(item); });
+            orderTasksWithHierarchy(overdue, closedSubtasksByParent).forEach(function (item) { out.push(item); });
         }
 
         var start = DateUtils.startOfDay(now);
@@ -761,7 +733,7 @@ PlasmoidItem {
             if (dayEvents.length === 0 && dayTasks.length === 0) continue;
             out.push({ type: "dayHeader", date: d });
             dayEvents.forEach(function (e) { out.push({ type: "event", data: e }); });
-            orderTasksWithHierarchy(dayTasks, closedSubtasksByParent, expandedSubtaskRecentlyClosedUids).forEach(function (item) { out.push(item); });
+            orderTasksWithHierarchy(dayTasks, closedSubtasksByParent).forEach(function (item) { out.push(item); });
         }
 
         // A task due further out than the "Show events up to" window (e.g.
@@ -783,14 +755,14 @@ PlasmoidItem {
                     return groupRootOf(todoByUid, a).due.getTime() - groupRootOf(todoByUid, b).due.getTime();
                 });
                 out.push({ type: "sectionHeader", label: "dueLater", count: later.length });
-                orderTasksWithHierarchy(later, closedSubtasksByParent, expandedSubtaskRecentlyClosedUids).forEach(function (item) { out.push(item); });
+                orderTasksWithHierarchy(later, closedSubtasksByParent).forEach(function (item) { out.push(item); });
             }
         }
 
         if (showTasks && noDue.length > 0) {
             noDue.sort(function (a, b) { return priorityRank(a) - priorityRank(b); });
             out.push({ type: "sectionHeader", label: "noDueDate", count: noDue.length });
-            orderTasksWithHierarchy(noDue, closedSubtasksByParent, expandedSubtaskRecentlyClosedUids).forEach(function (item) { out.push(item); });
+            orderTasksWithHierarchy(noDue, closedSubtasksByParent).forEach(function (item) { out.push(item); });
         }
 
         // "Recently closed": the most recently completed top-level tasks,
@@ -801,9 +773,8 @@ PlasmoidItem {
         // folded away by default (see recentlyClosedExpanded), since it's
         // an occasional undo tool, not something to keep in view. A
         // completed subtask whose parent is still around is excluded here
-        // - it already has its own nested mini-section right under that
-        // parent (see closedSubtasksByParent above), so it isn't shown
-        // twice.
+        // - it already renders indented right under that parent (see
+        // closedSubtasksByParent above), so it isn't shown twice.
         if (showTasks) {
             var recentlyClosed = allTodos.filter(function (t) {
                 return t.status === "COMPLETED" && !(t.parentUid && todoByUid[t.parentUid]);
@@ -818,15 +789,56 @@ PlasmoidItem {
                 var recentlyClosedExpanded = plasmoid.configuration.recentlyClosedExpanded;
                 out.push({ type: "recentlyClosedHeader", label: "recentlyClosed", count: recentlyClosed.length, expanded: recentlyClosedExpanded });
                 if (recentlyClosedExpanded) {
-                    recentlyClosed.forEach(function (t) { out.push({ type: "task", data: t }); });
+                    recentlyClosed.forEach(function (t) {
+                        // Reset any depth/childCount/collapsed stamped on
+                        // this same task object by an earlier
+                        // orderTasksWithHierarchy pass this cycle (e.g. if
+                        // "Show completed tasks" is also on) - this section
+                        // is flat and un-nested, never a group root.
+                        t.depth = 0;
+                        t.childCount = 0;
+                        t.collapsed = false;
+                        out.push({ type: "task", data: t });
+                    });
                 }
             }
         }
 
-        agendaItems = out;
+        agendaItems = groupTaskFamilies(out);
         overdueCount = overdue.length;
         todayCount = (eventsByDay[DateUtils.dayKey(now)] || []).length;
         nextEvent = computeNextEvent(events, now);
+    }
+
+    // Final display-only pass over the flat agendaItems sequence: wraps a
+    // top-level task (depth 0, childCount > 0, not collapsed) and every
+    // "task" entry immediately following it - its active subtasks, then
+    // its own recently-completed ones, both stamped depth > 0 by
+    // orderTasksWithHierarchy above - into one { type: "taskGroup" } entry,
+    // so FullRepresentation can render the whole family as a single
+    // TaskGroupDelegate sharing one accent bar spanning its full height,
+    // instead of each row drawing its own short one. Left as separate
+    // "task" entries otherwise (a childless task, or a collapsed one with
+    // nothing following it right now).
+    function groupTaskFamilies(items) {
+        var out = [];
+        var i = 0;
+        while (i < items.length) {
+            var item = items[i];
+            if (item.type === "task" && item.data.depth === 0 && item.data.childCount > 0 && !item.data.collapsed) {
+                var children = [];
+                i++;
+                while (i < items.length && items[i].type === "task" && items[i].data.depth > 0) {
+                    children.push(items[i].data);
+                    i++;
+                }
+                out.push({ type: "taskGroup", data: { root: item.data, children: children } });
+            } else {
+                out.push(item);
+                i++;
+            }
+        }
+        return out;
     }
 
     function computeNextEvent(events, now) {

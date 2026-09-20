@@ -27,12 +27,13 @@ file or with `kpackagetool6`.
   range-limited by that setting the way events are) / no due date, with a
   checkbox to mark them done directly from the widget, and subtasks (linked
   via `RELATED-TO`, e.g. from Nextcloud Tasks, or created directly from a
-  task's own "+" button) shown indented under their parent. A folded-away
-  "Recently closed" section (click to expand) lists the last few tasks
-  completed overall, as a quick way to find and reopen one - a completed
-  subtask shows up in its own parent task's small, separately foldable
-  "Recently closed" sub-list instead of the general one, so it stays easy
-  to find that specific task's finished work
+  task's own "+" button) shown indented under their parent, with a single
+  calendar-color bar spanning the whole task-plus-subtasks family so it
+  reads as one group at a glance. A folded-away "Recently closed" section
+  (click to expand) lists the last few tasks completed overall, as a quick
+  way to find and reopen one - a completed subtask instead shows up
+  indented under its own parent task (part of that same family bar), so it
+  isn't also duplicated in the general list
 - A popup form for adding, editing, or deleting events and tasks (single,
   non-recurring events only for editing/deleting), with title, calendar,
   due/start date+time, description, and location fields
