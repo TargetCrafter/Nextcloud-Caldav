@@ -360,6 +360,7 @@ Item {
                    ? parent.itemData.label : ""
             count: parent.itemData.count || 0
             depth: parent.itemData.depth || 0
+            barColor: parent.itemData.color || Kirigami.Theme.highlightColor
             expandable: parent.itemData.type === "recentlyClosedHeader"
             expanded: !!parent.itemData.expanded
             onToggleRequested: fullRep.toggleRecentlyClosedRequested()

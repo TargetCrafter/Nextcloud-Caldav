@@ -240,7 +240,7 @@ PlasmoidItem {
     }
 
     Component.onCompleted: {
-        console.log("Nextcloud Caldav: build 0.5.28 starting");
+        console.log("Nextcloud Caldav: build 0.5.29 starting");
         refresh();
         if (plasmoid.configuration.viewMode === 1 /* Month */) refreshMonth(monthCursor);
     }
@@ -543,7 +543,7 @@ PlasmoidItem {
 
             var closed = ((closedSubtasksByParent && closedSubtasksByParent[t.uid]) || []).slice(0, 10);
             if (closed.length > 0) {
-                out.push({ type: "subtaskRecentlyClosedHeader", label: "recentlyClosed", count: closed.length, depth: depth + 1 });
+                out.push({ type: "subtaskRecentlyClosedHeader", label: "recentlyClosed", count: closed.length, depth: depth + 1, color: t.calendarColor });
                 closed.forEach(function (c) {
                     c.depth = depth + 1;
                     c.childCount = 0;
