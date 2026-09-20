@@ -242,7 +242,7 @@ PlasmoidItem {
     }
 
     Component.onCompleted: {
-        console.log("Nextcloud Caldav: build 0.5.32 starting");
+        console.log("Nextcloud Caldav: build 0.5.33 starting");
         refresh();
         if (plasmoid.configuration.viewMode === 1 /* Month */) refreshMonth(monthCursor);
     }
@@ -481,15 +481,15 @@ PlasmoidItem {
     // Returns one agendaItems-shaped {type: "taskFamily", root, rows} entry
     // per top-level task, rather than a separate entry per row - a task
     // and everything that visually belongs to it (its active subtasks, and
-    // its own recently-completed subtasks behind a small "Recently closed"
+    // its own recently-completed subtasks behind a small "Completed"
     // heading, most-recent-first and capped the same way the flat
     // "Recently closed" section is) render together as one card with one
     // shared accent bar (see TaskFamilyCard.qml), instead of each row
     // trying to independently line its own bar segment up with its
     // neighbors' to read as continuous. `rows` holds everything under the
     // root in visual order: {kind: "task", data} for a subtask/closed
-    // subtask, {kind: "closedHeader", label, count, depth, color} for a
-    // "Recently closed" heading.
+    // subtask, {kind: "closedHeader", label, count, depth, color} for that
+    // "Completed" heading.
     function orderTasksWithHierarchy(tasks, closedSubtasksByParent) {
         // With "Show completed tasks" on, `tasks` can itself already
         // contain the very subtasks `closedSubtasksByParent` claims below
@@ -541,7 +541,7 @@ PlasmoidItem {
         }
 
         // Appends everything under `t` (subtasks, recursively, and t's own
-        // "Recently closed" subtask heading + rows) to `rows`, at `depth`
+        // "Completed" subtask heading + rows) to `rows`, at `depth`
         // (t's own depth + 1 for t's direct children). Never called for a
         // collapsed task - its descendants are left out entirely, not just
         // visually hidden, same as the old flat layout.
