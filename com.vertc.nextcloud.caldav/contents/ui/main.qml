@@ -13,8 +13,7 @@ PlasmoidItem {
     // Flat, pre-grouped render list consumed by FullRepresentation:
     // { type: "sectionHeader", label, count } |
     // { type: "dayHeader", date } |
-    // { type: "event", data } | { type: "task", data } |
-    // { type: "taskGroup", data: { root, children } } - see groupTaskFamilies
+    // { type: "event", data } | { type: "task", data }
     property var agendaItems: []
     property var nextEvent: null
     property int todayCount: 0
@@ -241,7 +240,7 @@ PlasmoidItem {
     }
 
     Component.onCompleted: {
-        console.log("Nextcloud Caldav: build 0.5.27 starting");
+        console.log("Nextcloud Caldav: build 0.5.28 starting");
         refresh();
         if (plasmoid.configuration.viewMode === 1 /* Month */) refreshMonth(monthCursor);
     }
@@ -480,11 +479,9 @@ PlasmoidItem {
     // Returns agendaItems-shaped {type, ...} entries directly (not bare
     // task objects) so a task's own recently-completed subtasks - passed
     // in via `closedSubtasksByParent` (see rebuildAgendaSections) - can be
-    // interleaved right after its active children, capped the same way
-    // the flat "Recently closed" section is. Rendered as plain indented
-    // task rows (no separate header) - groupTaskFamilies further down
-    // wraps a task and everything pushed here under it into one visual
-    // family sharing a single accent bar.
+    // interleaved right after its active children behind their own small
+    // "Recently closed" heading, capped and most-recent-first the same
+    // way the flat "Recently closed" section is.
     function orderTasksWithHierarchy(tasks, closedSubtasksByParent) {
         // With "Show completed tasks" on, `tasks` can itself already
         // contain the very subtasks `closedSubtasksByParent` claims below
@@ -545,12 +542,15 @@ PlasmoidItem {
             (childrenOf[t.uid] || []).forEach(function (c) { visit(c, depth + 1); });
 
             var closed = ((closedSubtasksByParent && closedSubtasksByParent[t.uid]) || []).slice(0, 10);
-            closed.forEach(function (c) {
-                c.depth = depth + 1;
-                c.childCount = 0;
-                c.collapsed = false;
-                out.push({ type: "task", data: c });
-            });
+            if (closed.length > 0) {
+                out.push({ type: "subtaskRecentlyClosedHeader", label: "recentlyClosed", count: closed.length, depth: depth + 1 });
+                closed.forEach(function (c) {
+                    c.depth = depth + 1;
+                    c.childCount = 0;
+                    c.collapsed = false;
+                    out.push({ type: "task", data: c });
+                });
+            }
         }
         roots.forEach(function (t) { visit(t, 0); });
         return out;
@@ -804,41 +804,10 @@ PlasmoidItem {
             }
         }
 
-        agendaItems = groupTaskFamilies(out);
+        agendaItems = out;
         overdueCount = overdue.length;
         todayCount = (eventsByDay[DateUtils.dayKey(now)] || []).length;
         nextEvent = computeNextEvent(events, now);
-    }
-
-    // Final display-only pass over the flat agendaItems sequence: wraps a
-    // top-level task (depth 0, childCount > 0, not collapsed) and every
-    // "task" entry immediately following it - its active subtasks, then
-    // its own recently-completed ones, both stamped depth > 0 by
-    // orderTasksWithHierarchy above - into one { type: "taskGroup" } entry,
-    // so FullRepresentation can render the whole family as a single
-    // TaskGroupDelegate sharing one accent bar spanning its full height,
-    // instead of each row drawing its own short one. Left as separate
-    // "task" entries otherwise (a childless task, or a collapsed one with
-    // nothing following it right now).
-    function groupTaskFamilies(items) {
-        var out = [];
-        var i = 0;
-        while (i < items.length) {
-            var item = items[i];
-            if (item.type === "task" && item.data.depth === 0 && item.data.childCount > 0 && !item.data.collapsed) {
-                var children = [];
-                i++;
-                while (i < items.length && items[i].type === "task" && items[i].data.depth > 0) {
-                    children.push(items[i].data);
-                    i++;
-                }
-                out.push({ type: "taskGroup", data: { root: item.data, children: children } });
-            } else {
-                out.push(item);
-                i++;
-            }
-        }
-        return out;
     }
 
     function computeNextEvent(events, now) {
