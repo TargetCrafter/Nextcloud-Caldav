@@ -13,60 +13,21 @@ Item {
     property date date
     property string label: ""
     property int count: 0
-    // Only "recentlyClosed" sets these - a fold/expand arrow like
-    // TaskDelegate's subtask one, for a section whose contents are
-    // optional to show at all (unlike "Overdue"/day headers, which are
-    // just labels over content that's always there).
+    // Only "recentlyClosed" sets these - a fold/expand arrow for a
+    // section whose contents are optional to show at all (unlike
+    // "Overdue"/day headers, which are just labels over content that's
+    // always there).
     property bool expandable: false
     property bool expanded: true
-    // Non-zero only for a task's own nested "Recently closed" subtask
-    // heading (see main.qml's orderTasksWithHierarchy) - indents it to
-    // the same depth TaskDelegate itself uses for subtask rows, and draws
-    // a bar segment (see below) so it reads as belonging to that task
-    // rather than as its own top-level section.
-    property int depth: 0
-    // Matches the parent task's own accent bar color - see
-    // TaskDelegate.qml's own accentBar.
-    property color barColor: Kirigami.Theme.highlightColor
     signal toggleRequested()
 
-    // See TaskDelegate.qml's own topGap for why this exists and why it's
-    // zero for a nested (depth > 0) heading, such as a task's own
-    // "Recently closed" subtask heading, which continues that task's
-    // family rather than starting a new one.
-    readonly property real topGap: header.depth > 0 ? 0 : Kirigami.Units.smallSpacing
-
-    implicitHeight: topGap + row.implicitHeight
-
-    // Same bar TaskDelegate draws for a subtask row, continuing the color
-    // column through this heading instead of leaving a gap in it. A
-    // nested heading (depth > 0) has no topGap of its own, and neither
-    // does the row above or below it in its family, so this bar's top and
-    // bottom edges land exactly on the neighboring rows' own bar edges
-    // with nothing to bridge - see TaskDelegate.qml's accentBar for the
-    // matching approach on its side.
-    Rectangle {
-        visible: header.depth > 0
-        anchors.left: parent.left
-        anchors.top: parent.top
-        anchors.bottom: parent.bottom
-        anchors.leftMargin: Kirigami.Units.mediumSpacing
-        width: Kirigami.Units.smallSpacing * 0.6
-        radius: width / 2
-        color: header.barColor
-    }
+    implicitHeight: row.implicitHeight
 
     RowLayout {
         id: row
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.top: parent.top
-        anchors.topMargin: header.topGap
-        anchors.bottom: parent.bottom
-        anchors.leftMargin: header.depth > 0
-                             ? Kirigami.Units.mediumSpacing + Kirigami.Units.smallSpacing * 0.6 + Kirigami.Units.smallSpacing +
-                               header.depth * Kirigami.Units.gridUnit
-                             : 0
+        anchors.verticalCenter: parent.verticalCenter
         spacing: Kirigami.Units.smallSpacing
 
         Kirigami.Icon {
@@ -80,7 +41,7 @@ Item {
         PlasmaComponents3.Label {
             Layout.fillWidth: true
             font.bold: true
-            font.pointSize: header.depth > 0 ? Kirigami.Theme.smallFont.pointSize : Kirigami.Theme.defaultFont.pointSize
+            font.pointSize: Kirigami.Theme.defaultFont.pointSize
             color: header.label === "overdue" ? Kirigami.Theme.negativeTextColor : Kirigami.Theme.disabledTextColor
             text: header.text()
 
