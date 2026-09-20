@@ -30,9 +30,9 @@ file or with `kpackagetool6`.
   task's own "+" button) shown indented under their parent. A folded-away
   "Recently closed" section (click to expand) lists the last few tasks
   completed overall, as a quick way to find and reopen one - a completed
-  subtask shows up in its own parent task's small "Recently closed"
-  sub-list instead of the general one, so it stays easy to find that
-  specific task's finished work
+  subtask shows up in its own parent task's small, separately foldable
+  "Recently closed" sub-list instead of the general one, so it stays easy
+  to find that specific task's finished work
 - A popup form for adding, editing, or deleting events and tasks (single,
   non-recurring events only for editing/deleting), with title, calendar,
   due/start date+time, description, and location fields

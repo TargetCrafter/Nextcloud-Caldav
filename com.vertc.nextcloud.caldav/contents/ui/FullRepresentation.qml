@@ -67,6 +67,7 @@ Item {
     signal toggleTask(var task)
     signal toggleTaskCollapseRequested(string uid)
     signal toggleRecentlyClosedRequested()
+    signal toggleSubtaskRecentlyClosedRequested(string uid)
     signal openConfigureRequested()
     signal createTaskRequested(string calendarHref, string summary, var due, bool dueHasTime, string description, string location, string parentUid)
     signal createEventRequested(string calendarHref, string summary, var start, var end, bool allDay, string description, string location)
@@ -360,9 +361,13 @@ Item {
                    ? parent.itemData.label : ""
             count: parent.itemData.count || 0
             depth: parent.itemData.depth || 0
-            expandable: parent.itemData.type === "recentlyClosedHeader"
+            barColor: parent.itemData.color || Kirigami.Theme.highlightColor
+            expandable: parent.itemData.type === "recentlyClosedHeader" || parent.itemData.type === "subtaskRecentlyClosedHeader"
             expanded: !!parent.itemData.expanded
-            onToggleRequested: fullRep.toggleRecentlyClosedRequested()
+            onToggleRequested: {
+                if (parent.itemData.type === "subtaskRecentlyClosedHeader") fullRep.toggleSubtaskRecentlyClosedRequested(parent.itemData.parentUid);
+                else fullRep.toggleRecentlyClosedRequested();
+            }
         }
     }
 

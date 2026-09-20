@@ -74,6 +74,14 @@
     <entry name="recentlyClosedExpanded" type="Bool">
       <default>false</default>
     </entry>
+    <!-- UIDs of parent tasks whose own nested "Recently closed" subtask
+         mini-section (see closedSubtasksByParent/toggleSubtaskRecentlyClosed
+         in main.qml) is currently open - same idea as
+         recentlyClosedExpanded above, just per parent task instead of one
+         flag. Pruned the same way collapsedTaskUids is. -->
+    <entry name="expandedSubtaskRecentlyClosedUids" type="StringList">
+      <default></default>
+    </entry>
   </group>
   <group name="General">
     <entry name="displayMode" type="Enum">
