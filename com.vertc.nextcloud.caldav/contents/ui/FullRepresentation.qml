@@ -227,7 +227,17 @@ Item {
             ListView {
                 id: agendaList
                 model: fullRep.agendaItems
-                spacing: Kirigami.Units.smallSpacing
+                // 0, not Kirigami.Units.smallSpacing - each delegate now
+                // builds its own leading gap into its own implicitHeight
+                // instead (see TaskDelegate/DayHeader/EventDelegate's own
+                // topGap), so a subtask row can collapse its gap to zero
+                // and sit flush against the row above it for a genuinely
+                // unbroken accent bar. A gap contributed by the ListView
+                // itself, between two independently-loaded delegates,
+                // can't be selectively removed only for family members -
+                // this can, since it's just ordinary content height, not
+                // extra space the view inserts between them.
+                spacing: 0
                 boundsBehavior: Flickable.StopAtBounds
 
                 delegate: Loader {
@@ -384,6 +394,10 @@ Item {
         EventDelegate {
             eventData: parent.itemData
             currentTime: fullRep.currentTime
+            // dayEventsList keeps its own non-zero ListView.spacing - see
+            // its declaration above - so this delegate must not also add
+            // its own leading gap, or the two would stack.
+            topGapEnabled: false
             onEditRequested: itemFormPopup.openForEdit(parent.itemData, false)
         }
     }

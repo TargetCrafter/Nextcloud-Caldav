@@ -13,6 +13,15 @@ Item {
     // hours) stale otherwise.
     property date currentTime
 
+    // On (the default) when used in agendaList, whose own ListView
+    // spacing is 0 - see TaskDelegate.qml's topGap for why - so this
+    // builds its own leading gap into its own height instead. Off for
+    // dayEventComponent's separate dayEventsList (the month view's
+    // day-detail panel), which still uses an ordinary non-zero
+    // ListView.spacing of its own, so adding a gap here too would double it.
+    property bool topGapEnabled: true
+    readonly property real topGap: topGapEnabled ? Kirigami.Units.smallSpacing : 0
+
     signal editRequested()
 
     // An event that has already ended (or, for a point-in-time event with
@@ -26,7 +35,7 @@ Item {
     // exactly, so the card's implicit height doesn't drift from the row's
     // natural content height - a mismatch there left the RowLayout taller
     // than its content and pushed the extra slack unevenly to one side.
-    implicitHeight: row.implicitHeight + Kirigami.Units.mediumSpacing * 2
+    implicitHeight: topGap + row.implicitHeight + Kirigami.Units.mediumSpacing * 2
 
     opacity: isPast ? 0.5 : 1
 
@@ -35,7 +44,11 @@ Item {
     }
 
     Rectangle {
-        anchors.fill: parent
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        anchors.topMargin: delegate.topGap
+        anchors.bottom: parent.bottom
         radius: Kirigami.Units.cornerRadius
         color: hover.hovered ? Kirigami.Theme.hoverColor : Kirigami.Theme.alternateBackgroundColor
         opacity: hover.hovered ? 1 : 0.35
@@ -43,8 +56,13 @@ Item {
 
     RowLayout {
         id: row
-        anchors.fill: parent
-        anchors.margins: Kirigami.Units.mediumSpacing
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        anchors.topMargin: delegate.topGap + Kirigami.Units.mediumSpacing
+        anchors.bottomMargin: Kirigami.Units.mediumSpacing
+        anchors.leftMargin: Kirigami.Units.mediumSpacing
+        anchors.rightMargin: Kirigami.Units.mediumSpacing
         spacing: Kirigami.Units.smallSpacing
 
         Rectangle {
