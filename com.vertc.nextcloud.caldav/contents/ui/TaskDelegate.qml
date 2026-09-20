@@ -44,24 +44,25 @@ Item {
     // along with the rest of its content, leaving every task's bar at a
     // different x instead of all lined up in a column.
     //
-    // A subtask row (depth > 0) reaches its bar past its own top edge by
-    // exactly the ListView's spacing (see agendaList.spacing in
-    // FullRepresentation.qml), and a task with subtasks shown below it
-    // (childCount > 0 && !collapsed) reaches past its own bottom edge the
-    // same way - each into what would otherwise be empty gap space
-    // between two ListView delegates - so consecutive bars within one
-    // family touch with no seam and read as one continuous line, instead
-    // of each row's short segment looking separate. DayHeader.qml's own
-    // accentBar (for a task's "Recently closed" subtask heading) does the
-    // matching bridge on its side.
+    // A subtask row (depth > 0) reaches its bar well past its own top
+    // edge, and a task with subtasks shown below it (childCount > 0 &&
+    // !collapsed) reaches well past its own bottom edge, each into what
+    // would otherwise be empty gap space between two ListView delegates -
+    // deliberately overshooting past just the ListView's own spacing
+    // (rather than matching it exactly), since matching it exactly still
+    // left a visible seam - so consecutive bars within one family overlap
+    // and read as one continuous line with no gap, instead of each row's
+    // short segment looking separate. DayHeader.qml's own accentBar (for
+    // a task's "Recently closed" subtask heading) does the matching
+    // bridge on its side.
     Rectangle {
         id: accentBar
         anchors.left: parent.left
         anchors.top: parent.top
         anchors.bottom: parent.bottom
         anchors.leftMargin: Kirigami.Units.mediumSpacing
-        anchors.topMargin: delegate.depth > 0 ? -Kirigami.Units.smallSpacing : Kirigami.Units.mediumSpacing
-        anchors.bottomMargin: (delegate.childCount > 0 && !delegate.collapsed) ? -Kirigami.Units.smallSpacing : Kirigami.Units.mediumSpacing
+        anchors.topMargin: delegate.depth > 0 ? -Kirigami.Units.smallSpacing * 2 : Kirigami.Units.mediumSpacing
+        anchors.bottomMargin: (delegate.childCount > 0 && !delegate.collapsed) ? -Kirigami.Units.smallSpacing * 2 : Kirigami.Units.mediumSpacing
         width: Kirigami.Units.smallSpacing * 0.6
         radius: width / 2
         color: delegate.taskData.calendarColor || Kirigami.Theme.highlightColor
