@@ -21,15 +21,32 @@ Item {
     readonly property int childCount: taskData.childCount || 0
     readonly property bool collapsed: !!taskData.collapsed
 
+    // Zero for a subtask (or a "Recently closed" subtask row) - it's a
+    // continuation of its parent's family, and agendaList's own spacing is
+    // 0 (see FullRepresentation.qml), so it sits flush against the row
+    // above with no inter-item gap to bridge. Non-zero only for a row that
+    // starts a new family (a top-level task), so there's still visible
+    // breathing room before it. This replaces the old approach of each row
+    // drawing its accent bar past its own edges into the ListView's
+    // between-item spacing - which left a visible seam depending on paint
+    // order - with a gap that's just ordinary content height, built into
+    // this row's own implicitHeight, so a continuing row's bar can start
+    // exactly where the previous row's bar ended.
+    readonly property real topGap: delegate.depth > 0 ? 0 : Kirigami.Units.smallSpacing
+
     // See EventDelegate.qml for why this must match the row's own margins.
-    implicitHeight: row.implicitHeight + Kirigami.Units.mediumSpacing * 2
+    implicitHeight: topGap + row.implicitHeight + Kirigami.Units.mediumSpacing * 2
 
     HoverHandler {
         id: hover
     }
 
     Rectangle {
-        anchors.fill: parent
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        anchors.topMargin: delegate.topGap
+        anchors.bottom: parent.bottom
         radius: Kirigami.Units.cornerRadius
         // Matches EventDelegate's card background - the calendar-color
         // accent bar below is what now tells tasks and events apart, the
@@ -44,25 +61,22 @@ Item {
     // along with the rest of its content, leaving every task's bar at a
     // different x instead of all lined up in a column.
     //
-    // A subtask row (depth > 0) reaches its bar well past its own top
-    // edge, and a task with subtasks shown below it (childCount > 0 &&
-    // !collapsed) reaches well past its own bottom edge, each into what
-    // would otherwise be empty gap space between two ListView delegates -
-    // deliberately overshooting past just the ListView's own spacing
-    // (rather than matching it exactly), since matching it exactly still
-    // left a visible seam - so consecutive bars within one family overlap
-    // and read as one continuous line with no gap, instead of each row's
-    // short segment looking separate. DayHeader.qml's own accentBar (for
-    // a task's "Recently closed" subtask heading) does the matching
-    // bridge on its side.
+    // A subtask row (depth > 0) reaches its own top edge exactly (no
+    // topGap, see above), and a task with subtasks shown below it
+    // (childCount > 0 && !collapsed) reaches its own bottom edge exactly -
+    // and since the next row in either case sits flush against this one
+    // (agendaList.spacing is 0, and a continuing row's own topGap is 0),
+    // the two bars' edges land on the exact same y with nothing to bridge,
+    // so they read as one continuous line. DayHeader.qml's own accentBar
+    // (for a task's "Recently closed" subtask heading) works the same way.
     Rectangle {
         id: accentBar
         anchors.left: parent.left
         anchors.top: parent.top
         anchors.bottom: parent.bottom
         anchors.leftMargin: Kirigami.Units.mediumSpacing
-        anchors.topMargin: delegate.depth > 0 ? -Kirigami.Units.smallSpacing * 2 : Kirigami.Units.mediumSpacing
-        anchors.bottomMargin: (delegate.childCount > 0 && !delegate.collapsed) ? -Kirigami.Units.smallSpacing * 2 : Kirigami.Units.mediumSpacing
+        anchors.topMargin: delegate.depth > 0 ? 0 : delegate.topGap + Kirigami.Units.mediumSpacing
+        anchors.bottomMargin: (delegate.childCount > 0 && !delegate.collapsed) ? 0 : Kirigami.Units.mediumSpacing
         width: Kirigami.Units.smallSpacing * 0.6
         radius: width / 2
         color: delegate.taskData.calendarColor || Kirigami.Theme.highlightColor
@@ -70,8 +84,12 @@ Item {
 
     RowLayout {
         id: row
-        anchors.fill: parent
-        anchors.margins: Kirigami.Units.mediumSpacing
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        anchors.topMargin: delegate.topGap + Kirigami.Units.mediumSpacing
+        anchors.bottomMargin: Kirigami.Units.mediumSpacing
+        anchors.rightMargin: Kirigami.Units.mediumSpacing
         anchors.leftMargin: Kirigami.Units.mediumSpacing + accentBar.width + Kirigami.Units.smallSpacing +
                              delegate.depth * Kirigami.Units.gridUnit
         spacing: Kirigami.Units.smallSpacing

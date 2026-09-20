@@ -30,25 +30,27 @@ Item {
     property color barColor: Kirigami.Theme.highlightColor
     signal toggleRequested()
 
-    implicitHeight: row.implicitHeight
+    // See TaskDelegate.qml's own topGap for why this exists and why it's
+    // zero for a nested (depth > 0) heading, such as a task's own
+    // "Recently closed" subtask heading, which continues that task's
+    // family rather than starting a new one.
+    readonly property real topGap: header.depth > 0 ? 0 : Kirigami.Units.smallSpacing
+
+    implicitHeight: topGap + row.implicitHeight
 
     // Same bar TaskDelegate draws for a subtask row, continuing the color
-    // column through this heading instead of leaving a gap in it. Reaches
-    // well past this item's own top/bottom - more than the ListView's own
-    // spacing between rows, deliberately overshooting into the
-    // neighboring rows' own bar area rather than trying to land exactly
-    // on the gap, since undershooting left a visible seam - so it
-    // touches (and slightly overlaps under) the neighboring rows' own
-    // bars with no gap. See TaskDelegate.qml's accentBar for the matching
-    // bridge on its side.
+    // column through this heading instead of leaving a gap in it. A
+    // nested heading (depth > 0) has no topGap of its own, and neither
+    // does the row above or below it in its family, so this bar's top and
+    // bottom edges land exactly on the neighboring rows' own bar edges
+    // with nothing to bridge - see TaskDelegate.qml's accentBar for the
+    // matching approach on its side.
     Rectangle {
         visible: header.depth > 0
         anchors.left: parent.left
         anchors.top: parent.top
         anchors.bottom: parent.bottom
         anchors.leftMargin: Kirigami.Units.mediumSpacing
-        anchors.topMargin: -Kirigami.Units.smallSpacing * 2
-        anchors.bottomMargin: -Kirigami.Units.smallSpacing * 2
         width: Kirigami.Units.smallSpacing * 0.6
         radius: width / 2
         color: header.barColor
@@ -58,7 +60,9 @@ Item {
         id: row
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.verticalCenter: parent.verticalCenter
+        anchors.top: parent.top
+        anchors.topMargin: header.topGap
+        anchors.bottom: parent.bottom
         anchors.leftMargin: header.depth > 0
                              ? Kirigami.Units.mediumSpacing + Kirigami.Units.smallSpacing * 0.6 + Kirigami.Units.smallSpacing +
                                header.depth * Kirigami.Units.gridUnit

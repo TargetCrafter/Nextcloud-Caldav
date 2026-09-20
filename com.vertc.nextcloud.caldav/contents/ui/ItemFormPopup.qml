@@ -20,6 +20,17 @@ QQC2.Popup {
     x: parent ? Math.round((parent.width - width) / 2) : 0
     y: parent ? Math.round((parent.height - height) / 2) : 0
     width: parent ? Math.min(Kirigami.Units.gridUnit * 22, parent.width - Kirigami.Units.gridUnit * 2) : Kirigami.Units.gridUnit * 22
+    // Capped the same way as width - on a short screen/panel the form's
+    // natural content height (more rows now than when this was first
+    // written, e.g. the split event date/time rows) can exceed available
+    // vertical space, clipping the bottom of the popup instead of
+    // shrinking or scrolling it. Sized off mainColumn's own implicitHeight
+    // rather than popup's own implicitHeight/contentHeight - which would
+    // be circular once that content sits inside a height-constrained
+    // ScrollView below - so the popup keeps its natural compact size when
+    // there's room, and caps itself (scrolling the rest) when there isn't.
+    height: parent ? Math.min(mainColumn.implicitHeight + topPadding + bottomPadding, parent.height - Kirigami.Units.gridUnit * 2)
+                   : mainColumn.implicitHeight + topPadding + bottomPadding
 
     background: Rectangle {
         radius: Kirigami.Units.cornerRadius
@@ -140,7 +151,16 @@ QQC2.Popup {
         onTriggered: popup.confirmingDelete = false
     }
 
+    // Scrolls the whole form when its capped height (see above) is
+    // shorter than the content actually needs, instead of just cutting it
+    // off at the popup's own bottom edge.
+    QQC2.ScrollView {
+        anchors.fill: parent
+        clip: true
+        contentWidth: availableWidth
+
     ColumnLayout {
+        id: mainColumn
         width: popup.availableWidth
         spacing: Kirigami.Units.smallSpacing
 
@@ -365,6 +385,7 @@ QQC2.Popup {
                 onClicked: popup.submit()
             }
         }
+    }
     }
 
     DatePickerPopup {
