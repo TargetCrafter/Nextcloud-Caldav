@@ -34,18 +34,21 @@ Item {
 
     // Same bar TaskDelegate draws for a subtask row, continuing the color
     // column through this heading instead of leaving a gap in it. Reaches
-    // past this item's own top/bottom by exactly the ListView's spacing
-    // (see agendaList.spacing in FullRepresentation.qml) so it visually
-    // touches the neighboring rows' own bars with no seam - see
-    // TaskDelegate.qml's accentBar for the matching bridge on its side.
+    // well past this item's own top/bottom - more than the ListView's own
+    // spacing between rows, deliberately overshooting into the
+    // neighboring rows' own bar area rather than trying to land exactly
+    // on the gap, since undershooting left a visible seam - so it
+    // touches (and slightly overlaps under) the neighboring rows' own
+    // bars with no gap. See TaskDelegate.qml's accentBar for the matching
+    // bridge on its side.
     Rectangle {
         visible: header.depth > 0
         anchors.left: parent.left
         anchors.top: parent.top
         anchors.bottom: parent.bottom
         anchors.leftMargin: Kirigami.Units.mediumSpacing
-        anchors.topMargin: -Kirigami.Units.smallSpacing
-        anchors.bottomMargin: -Kirigami.Units.smallSpacing
+        anchors.topMargin: -Kirigami.Units.smallSpacing * 2
+        anchors.bottomMargin: -Kirigami.Units.smallSpacing * 2
         width: Kirigami.Units.smallSpacing * 0.6
         radius: width / 2
         color: header.barColor
@@ -85,14 +88,11 @@ Item {
             }
         }
 
-        Kirigami.Separator {
-            // Skipped on a nested (depth > 0) heading - it's just a small
-            // label under its own task there, not a full section header
-            // with something trailing it (an arrow, on the expandable ones).
-            visible: header.depth === 0
+        Item {
+            // Spacer replacing the trailing separator line this header
+            // used to draw before its arrow (or its trailing edge, on a
+            // non-expandable one) - just empty space now.
             Layout.fillWidth: true
-            Layout.alignment: Qt.AlignVCenter
-            opacity: 0.5
         }
 
         PlasmaComponents3.ToolButton {

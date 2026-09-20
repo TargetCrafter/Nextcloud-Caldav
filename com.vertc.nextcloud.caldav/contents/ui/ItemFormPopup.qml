@@ -268,14 +268,23 @@ QQC2.Popup {
                 QQC2.ToolTip.text: i18n("Pick a date")
                 QQC2.ToolTip.visible: hovered
             }
+        }
+
+        // Split into its own row (rather than tacked onto the date row
+        // above) since with the date/time picker buttons added, the two
+        // rows' combined content no longer fits the popup's fixed width -
+        // it was overflowing past the popup's own edge instead of wrapping.
+        RowLayout {
+            Layout.fillWidth: true
+            visible: !popup.isTask && !allDayCheck.checked
+            spacing: Kirigami.Units.smallSpacing
+
             QQC2.TextField {
                 id: startTimeField
-                visible: !allDayCheck.checked
                 Layout.preferredWidth: Kirigami.Units.gridUnit * 4
                 placeholderText: "HH:MM"
             }
             QQC2.ToolButton {
-                visible: !allDayCheck.checked
                 icon.name: "clock"
                 onClicked: {
                     popup.activeTimeField = startTimeField;
@@ -286,18 +295,15 @@ QQC2.Popup {
                 QQC2.ToolTip.visible: hovered
             }
             QQC2.Label {
-                visible: !allDayCheck.checked
                 text: i18n("for")
             }
             QQC2.SpinBox {
                 id: durationSpin
-                visible: !allDayCheck.checked
                 from: 1
                 to: 24
                 value: 1
             }
             QQC2.Label {
-                visible: !allDayCheck.checked
                 text: i18n("h")
             }
         }
