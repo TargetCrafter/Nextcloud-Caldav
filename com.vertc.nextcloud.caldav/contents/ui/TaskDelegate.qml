@@ -7,6 +7,13 @@ Item {
     id: delegate
 
     required property var taskData
+    // False when embedded in a TaskGroupDelegate, which draws one shared
+    // accent bar for a whole family (a task + its subtasks) instead of
+    // each row drawing its own short segment - see that file. The row's
+    // own leftMargin still reserves the same space either way, so content
+    // lines up identically whether this bar is drawn here or by a parent
+    // TaskGroupDelegate.
+    property bool showAccentBar: true
     signal toggled()
     signal editRequested()
     signal addSubtaskRequested()
@@ -21,8 +28,14 @@ Item {
     readonly property int childCount: taskData.childCount || 0
     readonly property bool collapsed: !!taskData.collapsed
 
+    // Tighter top/bottom padding when embedded in a TaskGroupDelegate
+    // (stacked directly against sibling rows with no gap between them),
+    // so a family's rows read as one tight block instead of having the
+    // same breathing room a standalone card gets.
+    readonly property real vPadding: showAccentBar ? Kirigami.Units.mediumSpacing : Kirigami.Units.smallSpacing
+
     // See EventDelegate.qml for why this must match the row's own margins.
-    implicitHeight: row.implicitHeight + Kirigami.Units.mediumSpacing * 2
+    implicitHeight: row.implicitHeight + vPadding * 2
 
     HoverHandler {
         id: hover
@@ -45,6 +58,7 @@ Item {
     // different x instead of all lined up in a column.
     Rectangle {
         id: accentBar
+        visible: delegate.showAccentBar
         anchors.left: parent.left
         anchors.top: parent.top
         anchors.bottom: parent.bottom
@@ -59,7 +73,14 @@ Item {
     RowLayout {
         id: row
         anchors.fill: parent
-        anchors.margins: Kirigami.Units.mediumSpacing
+        anchors.topMargin: delegate.vPadding
+        anchors.bottomMargin: delegate.vPadding
+        anchors.rightMargin: Kirigami.Units.mediumSpacing
+        // Always reserves the same space accentBar.width would take up,
+        // even when showAccentBar is false and nothing is actually drawn
+        // there - so a row's content lines up identically whether its own
+        // bar is hidden in favor of a TaskGroupDelegate's single shared
+        // one, or drawn right here.
         anchors.leftMargin: Kirigami.Units.mediumSpacing + accentBar.width + Kirigami.Units.smallSpacing +
                              delegate.depth * Kirigami.Units.gridUnit
         spacing: Kirigami.Units.smallSpacing
