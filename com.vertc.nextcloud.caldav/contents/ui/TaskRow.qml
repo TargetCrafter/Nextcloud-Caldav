@@ -21,7 +21,15 @@ Item {
     signal toggleCollapseRequested()
 
     readonly property bool completed: taskData.status === "COMPLETED"
-    readonly property int depth: taskData.depth || 0
+    // Defaults to taskData's own stamped depth (see main.qml's
+    // orderTasksWithHierarchy), but can be overridden explicitly instead -
+    // see TaskFamilyCard.qml's "Recently completed" row wiring, which
+    // passes it straight from the row's own wrapper rather than relying
+    // on taskData.depth - a task object that's also being rendered
+    // elsewhere this same cycle (e.g. as its own top-level card, if its
+    // actual parent is filtered out of the active list) can have that
+    // field re-stamped by other code before this reads it.
+    property int depth: taskData.depth || 0
     // Stamped by main.qml's orderTasksWithHierarchy: childCount counts
     // every descendant (not just direct subtasks) a collapsed task hides;
     // collapsed reflects the persisted per-task fold state. Both are only

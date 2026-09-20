@@ -98,6 +98,11 @@ Item {
         id: taskRowComponent
         TaskRow {
             taskData: parent.rowData.data
+            // Only main.qml's "Recently completed" section sets an
+            // explicit depth on the row wrapper itself (see TaskRow.qml's
+            // own depth for why) - everywhere else falls back to
+            // TaskRow's own default of taskData.depth, same as before.
+            depth: parent.rowData.depth !== undefined ? parent.rowData.depth : (parent.rowData.data.depth || 0)
             showCompletedDate: card.showCompletedDate
             onToggled: card.toggled(parent.rowData.data)
             onEditRequested: card.editRequested(parent.rowData.data)

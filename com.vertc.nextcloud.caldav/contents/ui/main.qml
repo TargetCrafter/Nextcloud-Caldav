@@ -242,7 +242,7 @@ PlasmoidItem {
     }
 
     Component.onCompleted: {
-        console.log("Nextcloud Caldav: build 0.5.35 starting");
+        console.log("Nextcloud Caldav: build 0.5.36 starting");
         refresh();
         if (plasmoid.configuration.viewMode === 1 /* Month */) refreshMonth(monthCursor);
     }
@@ -834,10 +834,18 @@ PlasmoidItem {
                         t.childCount = 0;
                         t.collapsed = false;
                         var rows = (childrenOfAny[t.uid] || []).slice().sort(byDueDate).map(function (c) {
-                            c.depth = 1;
                             c.childCount = 0;
                             c.collapsed = false;
-                            return { kind: "task", data: c };
+                            // depth is carried on the wrapper itself, not
+                            // just stamped on `c` - `c` can also be
+                            // rendered elsewhere this same cycle (e.g. as
+                            // its own top-level card, if its actual parent
+                            // is filtered out of the active list), which
+                            // would otherwise be free to re-stamp
+                            // `c.depth` before TaskRow ever reads it. See
+                            // TaskRow.qml's own depth for the other half
+                            // of this.
+                            return { kind: "task", data: c, depth: 1 };
                         });
                         // showCompletedDate: unique to this section - a
                         // completed task's own due date isn't usually why
