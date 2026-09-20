@@ -5,7 +5,7 @@ import org.kde.kirigami as Kirigami
 
 import "../code/dateutils.js" as DateUtils
 
-RowLayout {
+Item {
     id: header
 
     // Either `date` (a day grouping header) or `label`+`count` (a named
@@ -21,60 +21,90 @@ RowLayout {
     property bool expanded: true
     // Non-zero only for a task's own nested "Recently closed" subtask
     // heading (see main.qml's orderTasksWithHierarchy) - indents it to
-    // roughly the same depth TaskDelegate itself uses for subtask rows,
-    // so it reads as belonging to that task rather than as its own
-    // top-level section.
+    // the same depth TaskDelegate itself uses for subtask rows, and draws
+    // a bar segment (see below) so it reads as belonging to that task
+    // rather than as its own top-level section.
     property int depth: 0
+    // Matches the parent task's own accent bar color - see
+    // TaskDelegate.qml's own accentBar.
+    property color barColor: Kirigami.Theme.highlightColor
     signal toggleRequested()
 
-    Layout.fillWidth: true
-    Layout.topMargin: Kirigami.Units.smallSpacing
-    Layout.bottomMargin: Kirigami.Units.smallSpacing / 2
-    Layout.leftMargin: depth > 0 ? Kirigami.Units.mediumSpacing + depth * Kirigami.Units.gridUnit : 0
-    spacing: Kirigami.Units.smallSpacing
+    implicitHeight: row.implicitHeight
 
-    Kirigami.Icon {
-        visible: header.label === "overdue"
-        source: "task-attention"
-        color: Kirigami.Theme.negativeTextColor
-        Layout.preferredWidth: Kirigami.Units.iconSizes.small
-        Layout.preferredHeight: Kirigami.Units.iconSizes.small
+    // Same bar TaskDelegate draws for a subtask row, continuing the color
+    // column through this heading instead of leaving a gap in it. Reaches
+    // past this item's own top/bottom by exactly the ListView's spacing
+    // (see agendaList.spacing in FullRepresentation.qml) so it visually
+    // touches the neighboring rows' own bars with no seam - see
+    // TaskDelegate.qml's accentBar for the matching bridge on its side.
+    Rectangle {
+        visible: header.depth > 0
+        anchors.left: parent.left
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        anchors.leftMargin: Kirigami.Units.mediumSpacing
+        anchors.topMargin: -Kirigami.Units.smallSpacing
+        anchors.bottomMargin: -Kirigami.Units.smallSpacing
+        width: Kirigami.Units.smallSpacing * 0.6
+        radius: width / 2
+        color: header.barColor
     }
 
-    PlasmaComponents3.Label {
-        Layout.fillWidth: true
-        font.bold: true
-        font.pointSize: header.depth > 0 ? Kirigami.Theme.smallFont.pointSize : Kirigami.Theme.defaultFont.pointSize
-        color: header.label === "overdue" ? Kirigami.Theme.negativeTextColor : Kirigami.Theme.disabledTextColor
-        text: header.text()
+    RowLayout {
+        id: row
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.verticalCenter: parent.verticalCenter
+        anchors.leftMargin: header.depth > 0
+                             ? Kirigami.Units.mediumSpacing + Kirigami.Units.smallSpacing * 0.6 + Kirigami.Units.smallSpacing +
+                               header.depth * Kirigami.Units.gridUnit
+                             : 0
+        spacing: Kirigami.Units.smallSpacing
 
-        MouseArea {
-            anchors.fill: parent
-            visible: header.expandable
-            cursorShape: Qt.PointingHandCursor
-            onClicked: header.toggleRequested()
+        Kirigami.Icon {
+            visible: header.label === "overdue"
+            source: "task-attention"
+            color: Kirigami.Theme.negativeTextColor
+            Layout.preferredWidth: Kirigami.Units.iconSizes.small
+            Layout.preferredHeight: Kirigami.Units.iconSizes.small
         }
-    }
 
-    Kirigami.Separator {
-        // Skipped on a nested (depth > 0) heading - it's just a small
-        // label under its own task there, not a full section header with
-        // something trailing it (an arrow, on the expandable ones).
-        visible: header.depth === 0
-        Layout.fillWidth: true
-        Layout.alignment: Qt.AlignVCenter
-        opacity: 0.5
-    }
+        PlasmaComponents3.Label {
+            Layout.fillWidth: true
+            font.bold: true
+            font.pointSize: header.depth > 0 ? Kirigami.Theme.smallFont.pointSize : Kirigami.Theme.defaultFont.pointSize
+            color: header.label === "overdue" ? Kirigami.Theme.negativeTextColor : Kirigami.Theme.disabledTextColor
+            text: header.text()
 
-    PlasmaComponents3.ToolButton {
-        visible: header.expandable
-        flat: true
-        icon.name: header.expanded ? "arrow-down" : "arrow-right"
-        Layout.preferredWidth: Kirigami.Units.iconSizes.small + Kirigami.Units.smallSpacing
-        Layout.preferredHeight: Layout.preferredWidth
-        onClicked: header.toggleRequested()
-        PlasmaComponents3.ToolTip.text: header.expanded ? i18n("Hide") : i18n("Show")
-        PlasmaComponents3.ToolTip.visible: hovered
+            MouseArea {
+                anchors.fill: parent
+                visible: header.expandable
+                cursorShape: Qt.PointingHandCursor
+                onClicked: header.toggleRequested()
+            }
+        }
+
+        Kirigami.Separator {
+            // Skipped on a nested (depth > 0) heading - it's just a small
+            // label under its own task there, not a full section header
+            // with something trailing it (an arrow, on the expandable ones).
+            visible: header.depth === 0
+            Layout.fillWidth: true
+            Layout.alignment: Qt.AlignVCenter
+            opacity: 0.5
+        }
+
+        PlasmaComponents3.ToolButton {
+            visible: header.expandable
+            flat: true
+            icon.name: header.expanded ? "arrow-down" : "arrow-right"
+            Layout.preferredWidth: Kirigami.Units.iconSizes.small + Kirigami.Units.smallSpacing
+            Layout.preferredHeight: Layout.preferredWidth
+            onClicked: header.toggleRequested()
+            PlasmaComponents3.ToolTip.text: header.expanded ? i18n("Hide") : i18n("Show")
+            PlasmaComponents3.ToolTip.visible: hovered
+        }
     }
 
     function text() {
