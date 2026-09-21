@@ -130,6 +130,11 @@
       <choices>
         <choice name="List"/>
         <choice name="Month"/>
+        <!-- Appended, not inserted between List/Month above - Enum choices
+             are ordinal, so an existing user's saved List/Month choice must
+             keep meaning exactly what it always has. -->
+        <choice name="Week"/>
+        <choice name="WorkWeek"/>
       </choices>
       <default>List</default>
     </entry>

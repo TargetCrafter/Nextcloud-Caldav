@@ -47,9 +47,11 @@ file or with `kpackagetool6`.
 - Configurable look-ahead window and refresh interval
 - Restrict a widget instance to events only, tasks only, or both combined —
   useful for placing separate calendar and to-do widgets side by side
-- Optional month-calendar layout (in place of the agenda list), with colored
-  dots marking days that have events, a Today button, and click-to-inspect
-  days
+- Optional Month, Week, or Work week calendar layout (in place of the agenda
+  list) - Month shows colored dots marking days that have events; Week/Work
+  week show a single row (Sunday-Saturday or Monday-Friday) with a few of
+  each day's event titles directly, since there's more room per day. All
+  three have a Today button and click-to-inspect days
 - New-item date fields follow your system's day/month order
 - Desktop notifications for an event's own reminder (VALARM, e.g. set in
   Nextcloud Calendar) and for a task becoming due soon (configurable
@@ -228,10 +230,10 @@ To remove it: `kpackagetool6 --type Plasma/Applet --remove com.vertc.nextcloud.c
   created by a client that names resources differently will fail to
   resolve, surfaced as a clear "server address not found"-style error
   rather than silently doing nothing.
-- The month-calendar layout shows events only (no task due dates), and
-  isn't available when a widget instance is set to Tasks only. Browsing to
-  a different month issues its own fetch scoped to that month, separate
-  from the agenda list's look-ahead window.
+- The Month/Week/Work week calendar layouts show events only (no task due
+  dates), and aren't available when a widget instance is set to Tasks only.
+  Browsing to a different month or week issues its own fetch scoped to
+  that period, separate from the agenda list's look-ahead window.
 
 ## Package layout
 

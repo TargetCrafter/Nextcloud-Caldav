@@ -19,6 +19,15 @@ function startOfMonth(date) {
     return new Date(date.getFullYear(), date.getMonth(), 1);
 }
 
+// Sunday of the week containing `date` - the same first-day-of-week
+// convention MonthView.qml's own month grid already uses (Su Mo Tu We Th
+// Fr Sa), so a week/work-week view lines up with it exactly.
+function startOfWeek(date) {
+    var d = startOfDay(date);
+    d.setDate(d.getDate() - d.getDay());
+    return d;
+}
+
 // Always returns the 1st of the resulting month (months is a count, not a
 // day-preserving offset) - callers that need a specific day within it add
 // that separately.

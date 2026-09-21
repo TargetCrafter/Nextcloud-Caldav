@@ -39,10 +39,15 @@ PlasmoidItem {
     // minutes - as long as 4 hours - stale otherwise).
     property date currentTime: new Date()
 
-    // Separate data/loading state for the month-calendar view (Appearance
-    // setting "viewMode"). Kept independent of agendaItems above: browsing
-    // to a different month needs events from outside the daysAhead window
-    // refresh() fetches, so it's populated by its own refreshMonth() calls.
+    // Separate data/loading state for the Month/Week/WorkWeek calendar-grid
+    // view (Appearance setting "viewMode"). Kept independent of agendaItems
+    // above: browsing to a different period needs events from outside the
+    // daysAhead window refresh() fetches, so it's populated by its own
+    // refreshMonth() calls. monthCursor is "a date within the currently
+    // displayed period" - the exact day only matters in Month mode (it's
+    // reset to the 1st); Week/WorkWeek mode derives the displayed
+    // Sunday-Saturday week from whatever day this is (see
+    // MonthView.qml's buildWeeks/main.qml's isWeekViewMode).
     property var monthEvents: []
     property bool monthLoading: false
     property string monthError: ""
@@ -234,17 +239,42 @@ PlasmoidItem {
         function onShowCompletedTasksChanged() { refreshDebounce.restart() }
         function onDisplayModeChanged() { refreshDebounce.restart() }
         function onViewModeChanged() {
-            if (plasmoid.configuration.viewMode === 1 /* Month */ &&
-                root.monthEvents.length === 0 && !root.monthLoading) {
-                root.refreshMonth(root.monthCursor);
-            }
+            // Always refetches, rather than only when monthEvents is still
+            // empty - Month fetches a whole month, Week/WorkWeek only the
+            // one displayed week, so cached data from one doesn't
+            // necessarily cover what the other now needs (e.g. switching
+            // from Week to Month leaves the rest of that month's days
+            // without their events fetched at all).
+            if (root.isCalendarViewMode()) root.refreshMonth(root.monthCursor);
         }
     }
 
     Component.onCompleted: {
-        console.log("Nextcloud Caldav: build 0.5.38 starting");
+        console.log("Nextcloud Caldav: build 0.5.39 starting");
         refresh();
-        if (plasmoid.configuration.viewMode === 1 /* Month */) refreshMonth(monthCursor);
+        if (isCalendarViewMode()) {
+            // monthCursor's own property default (see its declaration
+            // above) is always start-of-month, which is exactly right for
+            // Month mode but would show the wrong week on startup in
+            // Week/WorkWeek mode (whichever week the 1st happens to fall
+            // in, not today's) - normalize it the same way jumpToMonth
+            // already does before that first fetch.
+            monthCursor = isWeekViewMode() ? new Date() : DateUtils.startOfMonth(new Date());
+            refreshMonth(monthCursor);
+        }
+    }
+
+    // Month, Week, and WorkWeek all render through the same MonthView grid
+    // (see FullRepresentation.qml's monthMode) and share monthCursor/
+    // monthEvents/refreshMonth - only List is a plain agenda.
+    function isCalendarViewMode() {
+        var mode = plasmoid.configuration.viewMode;
+        return mode === 1 /* Month */ || mode === 2 /* Week */ || mode === 3 /* WorkWeek */;
+    }
+
+    function isWeekViewMode() {
+        var mode = plasmoid.configuration.viewMode;
+        return mode === 2 /* Week */ || mode === 3 /* WorkWeek */;
     }
 
     function enabledCalendarList() {
@@ -1081,20 +1111,28 @@ PlasmoidItem {
         return i18n("%1 events today, %2 tasks overdue", todayCount, overdueCount);
     }
 
+    // delta counts months in Month mode, weeks in Week/WorkWeek mode - one
+    // "page" of whichever grid MonthView is currently showing.
     function changeMonth(delta) {
-        monthCursor = delta === 0 ? monthCursor : DateUtils.addMonths(monthCursor, delta);
+        if (delta === 0) { refreshMonth(monthCursor); return; }
+        monthCursor = isWeekViewMode() ? DateUtils.addDays(monthCursor, delta * 7) : DateUtils.addMonths(monthCursor, delta);
         refreshMonth(monthCursor);
     }
 
+    // monthDate is "a date within the period to jump to" - only Month mode
+    // needs it snapped to the 1st, since Week/WorkWeek derive their own
+    // displayed range from whatever day this is (see refreshMonth/
+    // MonthView.qml's buildWeeks).
     function jumpToMonth(monthDate) {
-        monthCursor = DateUtils.startOfMonth(monthDate);
+        monthCursor = isWeekViewMode() ? DateUtils.startOfDay(monthDate) : DateUtils.startOfMonth(monthDate);
         refreshMonth(monthCursor);
     }
 
-    // Populates monthEvents for the given month. Independent of refresh()'s
-    // daysAhead-bounded event fetch above - browsing to a different month
-    // needs a CalDAV request scoped to that month specifically, since
-    // refresh() never requests data outside its own upcoming-days window.
+    // Populates monthEvents for the given month/week. Independent of
+    // refresh()'s daysAhead-bounded event fetch above - browsing to a
+    // different period needs a CalDAV request scoped to that period
+    // specifically, since refresh() never requests data outside its own
+    // upcoming-days window.
     function refreshMonth(monthDate) {
         if (!accountConfigured) return;
         var calendars = enabledCalendarList().filter(function (c) { return c.kinds.indexOf("VEVENT") !== -1; });
@@ -1112,8 +1150,12 @@ PlasmoidItem {
         var username = plasmoid.configuration.username;
         var password = plasmoid.configuration.appPassword;
 
-        var rangeStart = DateUtils.startOfMonth(monthDate);
-        var rangeEnd = DateUtils.addMonths(rangeStart, 1);
+        // A Week/WorkWeek grid can straddle a month boundary (e.g. the last
+        // days of September alongside the first of October) - fetching by
+        // week, not always by month, keeps every visible day's events
+        // requested regardless of which side of that boundary it falls on.
+        var rangeStart = isWeekViewMode() ? DateUtils.startOfWeek(monthDate) : DateUtils.startOfMonth(monthDate);
+        var rangeEnd = isWeekViewMode() ? DateUtils.addDays(rangeStart, 7) : DateUtils.addMonths(rangeStart, 1);
 
         var pending = calendars.length;
         var collected = [];

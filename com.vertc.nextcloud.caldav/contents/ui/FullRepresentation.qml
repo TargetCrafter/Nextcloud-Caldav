@@ -19,14 +19,18 @@ Item {
     property var availableCalendars: []
     property date currentTime
 
-    // Month-calendar view (Appearance setting "viewMode"), fed from root's
-    // own refreshMonth() - see main.qml.
+    // Month/Week/WorkWeek calendar-grid view (Appearance setting
+    // "viewMode"), fed from root's own refreshMonth() - see main.qml. The
+    // property names are unchanged from when this was Month-only, but the
+    // "month" they describe is a week's worth of days in Week/WorkWeek mode.
     property var monthEvents: []
     property bool monthLoading: false
     property date monthCursor
     property date selectedDate: new Date()
 
-    readonly property bool monthMode: plasmoid.configuration.viewMode === 1 /* Month */ &&
+    readonly property int viewMode: plasmoid.configuration.viewMode
+    readonly property bool weekMode: viewMode === 2 /* Week */ || viewMode === 3 /* WorkWeek */
+    readonly property bool monthMode: (viewMode === 1 /* Month */ || weekMode) &&
                                        plasmoid.configuration.displayMode !== 2 /* TasksOnly */
     readonly property var selectedDayEvents: computeSelectedDayEvents()
     // The next day after selectedDate (within the currently loaded month -
@@ -36,15 +40,23 @@ Item {
     // loaded month has nothing.
     readonly property var nextEventDay: computeNextEventDay()
 
-    // Only jump the selected day when navigating to a month that doesn't
-    // contain it (not unconditionally on every monthCursor change, which
-    // clobbered the "today" default back to the 1st as soon as monthCursor
-    // got its very first value from root at construction time).
+    // Only jump the selected day when navigating to a period that no
+    // longer contains it (not unconditionally on every monthCursor change,
+    // which clobbered the "today" default back to the 1st/the week's start
+    // as soon as monthCursor got its very first value from root at
+    // construction time).
     onMonthCursorChanged: {
-        if (fullRep.selectedDate.getFullYear() !== fullRep.monthCursor.getFullYear() ||
-            fullRep.selectedDate.getMonth() !== fullRep.monthCursor.getMonth()) {
-            fullRep.selectedDate = new Date(fullRep.monthCursor);
+        var stillShown;
+        if (fullRep.weekMode) {
+            var weekStart = DateUtils.startOfWeek(fullRep.monthCursor);
+            var weekEnd = DateUtils.addDays(weekStart, 6);
+            stillShown = fullRep.selectedDate.getTime() >= weekStart.getTime() &&
+                         fullRep.selectedDate.getTime() <= weekEnd.getTime();
+        } else {
+            stillShown = fullRep.selectedDate.getFullYear() === fullRep.monthCursor.getFullYear() &&
+                         fullRep.selectedDate.getMonth() === fullRep.monthCursor.getMonth();
         }
+        if (!stillShown) fullRep.selectedDate = new Date(fullRep.monthCursor);
     }
 
     readonly property string addLockedType: {
@@ -89,9 +101,9 @@ Item {
     function headerTitle() {
         var mode = plasmoid.configuration.displayMode;
         if (mode === 2 /* TasksOnly */) return i18n("Tasks");
-        var isMonth = plasmoid.configuration.viewMode === 1 /* Month */;
-        if (mode === 1 /* EventsOnly */) return isMonth ? i18n("Calendar") : i18n("Agenda");
-        return isMonth ? i18n("Calendar + Tasks") : i18n("Agenda + Tasks");
+        var isCalendar = fullRep.viewMode === 1 /* Month */ || fullRep.weekMode;
+        if (mode === 1 /* EventsOnly */) return isCalendar ? i18n("Calendar") : i18n("Agenda");
+        return isCalendar ? i18n("Calendar + Tasks") : i18n("Agenda + Tasks");
     }
 
     function computeSelectedDayEvents() {
@@ -256,6 +268,7 @@ Item {
             MonthView {
                 Layout.fillWidth: true
                 Layout.margins: Kirigami.Units.smallSpacing
+                viewMode: fullRep.viewMode
                 monthEvents: fullRep.monthEvents
                 monthLoading: fullRep.monthLoading
                 monthCursor: fullRep.monthCursor
