@@ -81,7 +81,7 @@ Kirigami.FormLayout {
     QQC2.ComboBox {
         id: viewModeCombo
         Kirigami.FormData.label: i18n("Layout:")
-        model: [i18n("Agenda list"), i18n("Month calendar")]
+        model: [i18n("Agenda list"), i18n("Month calendar"), i18n("Week calendar"), i18n("Work week calendar")]
         enabled: displayModeCombo.currentIndex !== 2
     }
 
@@ -90,7 +90,7 @@ Kirigami.FormLayout {
         visible: displayModeCombo.currentIndex === 2
         opacity: 0.7
         font.pointSize: Kirigami.Theme.smallFont.pointSize
-        text: i18n("Month view isn't available in Tasks only mode.")
+        text: i18n("Calendar views aren't available in Tasks only mode.")
     }
 
     Kirigami.Separator {
