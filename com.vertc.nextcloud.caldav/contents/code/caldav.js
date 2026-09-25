@@ -330,15 +330,33 @@ function deleteResource(serverUrl, username, password, href, etag, callback) {
 // A servers/clients that name event resources differently than
 // <uid>.ics will 404 here - surfaced as a plain "notfound" error rather
 // than guessed around further.
+//
+// The etag comes from a PROPFIND's <d:getetag> - the same mechanism
+// fetchTodos above already uses for tasks - rather than the GET
+// response's own ETag header: that header was seen not matching what the
+// server actually compared the next If-Match against, so a save right
+// after opening the edit popup failed with a 412 Precondition Failed
+// even though nothing had changed in the meantime. PROPFIND and GET are
+// two separate requests here (rather than trying to read a response
+// header off the GET), so this can't be affected by that mismatch.
 function fetchEventResource(serverUrl, username, password, calendarHref, uid, callback) {
     var href = eventResourceHref(calendarHref, uid);
     var url = resolveHref(serverUrl, href);
-    sendRequest("GET", url, username, password, { "Accept": "text/calendar" }, null, function (err, xhr) {
-        if (err) { callback(err, null); return; }
-        var etag = null;
-        try { etag = xhr.getResponseHeader("ETag"); } catch (e) { /* no header support, fine without */ }
-        callback(null, { href: href, etag: etag, icsText: xhr.responseText });
-    });
+    var body = '<?xml version="1.0" encoding="utf-8" ?>' +
+        '<d:propfind xmlns:d="DAV:"><d:prop><d:getetag/></d:prop></d:propfind>';
+    sendRequest("PROPFIND", url, username, password, { "Depth": "0", "Content-Type": "application/xml; charset=utf-8" }, body,
+        function (err, xhr) {
+            if (err) { callback(err, null); return; }
+            var etag = null;
+            try {
+                var raw = extractFirst(stripNamespacePrefixes(xhr.responseText), "getetag");
+                etag = raw ? decodeXmlEntities(raw) : null;
+            } catch (e) { /* fine without - updateResource/deleteResource just omit If-Match */ }
+            sendRequest("GET", url, username, password, { "Accept": "text/calendar" }, null, function (getErr, getXhr) {
+                if (getErr) { callback(getErr, null); return; }
+                callback(null, { href: href, etag: etag, icsText: getXhr.responseText });
+            });
+        });
 }
 
 // Creates a brand-new calendar object resource at <calendarHref><uid>.ics.
