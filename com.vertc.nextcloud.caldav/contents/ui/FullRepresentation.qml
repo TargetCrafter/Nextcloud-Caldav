@@ -119,9 +119,11 @@ Item {
 
     // Returns { date, events } for the earliest day strictly after
     // selectedDate that has an event, or null if there isn't one in
-    // monthEvents (which only covers the currently displayed month - this
-    // deliberately doesn't reach into a following month's data that hasn't
-    // been fetched).
+    // monthEvents (which only covers the currently displayed period - the
+    // visible grid in Month mode, which pads a few days into the
+    // previous/next month, or the one week in Week/WorkWeek mode - this
+    // deliberately doesn't reach any further into a following month's
+    // data that hasn't been fetched).
     function computeNextEventDay() {
         var after = DateUtils.startOfDay(fullRep.selectedDate);
         after.setDate(after.getDate() + 1);
