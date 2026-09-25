@@ -250,7 +250,7 @@ PlasmoidItem {
     }
 
     Component.onCompleted: {
-        console.log("Nextcloud Caldav: build 0.5.40 starting");
+        console.log("Nextcloud Caldav: build 0.5.41 starting");
         refresh();
         if (isCalendarViewMode()) {
             // monthCursor's own property default (see its declaration
