@@ -195,7 +195,7 @@ PlasmoidItem {
         repeat: false
         onTriggered: {
             if (root.isLoading) {
-                console.warn("CalDAV Agenda: refresh timed out after", interval / 1000, "s");
+                root.logWarn("Refresh timed out after " + (interval / 1000) + "s");
                 root.isLoading = false;
                 root.lastError = "timeout";
             }
@@ -250,7 +250,7 @@ PlasmoidItem {
     }
 
     Component.onCompleted: {
-        console.log("Nextcloud Caldav: build 0.5.39 starting");
+        console.log("Nextcloud Caldav: build 0.5.40 starting");
         refresh();
         if (isCalendarViewMode()) {
             // monthCursor's own property default (see its declaration
@@ -412,7 +412,7 @@ PlasmoidItem {
                         console.log("CalDAV Agenda: events response for", cal.name, "- error:", err, "count:", items ? items.length : 0);
                         try {
                             if (err) {
-                                console.warn("CalDAV Agenda: fetching events for", cal.name, "failed:", err);
+                                root.logWarn("Fetching events for " + cal.name + " failed: " + err);
                                 firstError = firstError || err;
                                 return;
                             }
@@ -427,18 +427,18 @@ PlasmoidItem {
                                         collectedEvents.push(e);
                                     });
                                 } catch (parseErr) {
-                                    console.warn("CalDAV Agenda: skipping malformed event in", cal.name, ":", parseErr);
+                                    root.logWarn("Skipping malformed event in " + cal.name + ": " + parseErr);
                                 }
                             });
                         } catch (fatalErr) {
-                            console.warn("CalDAV Agenda: unexpected error handling events for", cal.name, ":", fatalErr);
+                            root.logWarn("Unexpected error handling events for " + cal.name + ": " + fatalErr);
                             firstError = firstError || "parse";
                         } finally {
                             checkDone();
                         }
                     });
                 } catch (initErr) {
-                    console.warn("CalDAV Agenda: failed to start events request for", cal.name, ":", initErr);
+                    root.logWarn("Failed to start events request for " + cal.name + ": " + initErr);
                     firstError = firstError || "network";
                     checkDone();
                 }
@@ -451,7 +451,7 @@ PlasmoidItem {
                         console.log("CalDAV Agenda: tasks response for", cal.name, "- error:", err, "count:", items ? items.length : 0);
                         try {
                             if (err) {
-                                console.warn("CalDAV Agenda: fetching tasks for", cal.name, "failed:", err);
+                                root.logWarn("Fetching tasks for " + cal.name + " failed: " + err);
                                 firstError = firstError || err;
                                 return;
                             }
@@ -466,18 +466,18 @@ PlasmoidItem {
                                         collectedTodos.push(t);
                                     });
                                 } catch (parseErr) {
-                                    console.warn("CalDAV Agenda: skipping malformed task in", cal.name, ":", parseErr);
+                                    root.logWarn("Skipping malformed task in " + cal.name + ": " + parseErr);
                                 }
                             });
                         } catch (fatalErr) {
-                            console.warn("CalDAV Agenda: unexpected error handling tasks for", cal.name, ":", fatalErr);
+                            root.logWarn("Unexpected error handling tasks for " + cal.name + ": " + fatalErr);
                             firstError = firstError || "parse";
                         } finally {
                             checkDone();
                         }
                     });
                 } catch (initErr) {
-                    console.warn("CalDAV Agenda: failed to start tasks request for", cal.name, ":", initErr);
+                    root.logWarn("Failed to start tasks request for " + cal.name + ": " + initErr);
                     firstError = firstError || "network";
                     checkDone();
                 }
@@ -1001,7 +1001,7 @@ PlasmoidItem {
             plasmoid.configuration.appPassword, task.href, task.etag, icsText,
             function (err) {
                 if (err) {
-                    console.warn("CalDAV Agenda: failed to update task:", err);
+                    root.logWarn("Failed to update task: " + err);
                     formError = errorSummary(err);
                 } else {
                     root.itemActionToken++;
@@ -1016,7 +1016,7 @@ PlasmoidItem {
             plasmoid.configuration.appPassword, task.href, task.etag,
             function (err) {
                 if (err) {
-                    console.warn("CalDAV Agenda: failed to delete task:", err);
+                    root.logWarn("Failed to delete task: " + err);
                     formError = errorSummary(err);
                 } else {
                     root.itemActionToken++;
@@ -1034,13 +1034,13 @@ PlasmoidItem {
         CalDAV.fetchEventResource(plasmoid.configuration.serverUrl, plasmoid.configuration.username,
             plasmoid.configuration.appPassword, event.calendarHref, event.uid,
             function (err, resource) {
-                if (err) { console.warn("CalDAV Agenda: failed to locate event for editing:", err); formError = errorSummary(err); return; }
+                if (err) { root.logWarn("Failed to locate event for editing: " + err); formError = errorSummary(err); return; }
                 var icsText = ICAL.patchEventFields(resource.icsText, { summary: summary, start: start, end: end, allDay: allDay, description: description, location: location });
                 CalDAV.updateResource(plasmoid.configuration.serverUrl, plasmoid.configuration.username,
                     plasmoid.configuration.appPassword, resource.href, resource.etag, icsText,
                     function (err2) {
                         if (err2) {
-                            console.warn("CalDAV Agenda: failed to update event:", err2);
+                            root.logWarn("Failed to update event: " + err2);
                             formError = errorSummary(err2);
                         } else {
                             root.itemActionToken++;
@@ -1055,12 +1055,12 @@ PlasmoidItem {
         CalDAV.fetchEventResource(plasmoid.configuration.serverUrl, plasmoid.configuration.username,
             plasmoid.configuration.appPassword, event.calendarHref, event.uid,
             function (err, resource) {
-                if (err) { console.warn("CalDAV Agenda: failed to locate event for deletion:", err); formError = errorSummary(err); return; }
+                if (err) { root.logWarn("Failed to locate event for deletion: " + err); formError = errorSummary(err); return; }
                 CalDAV.deleteResource(plasmoid.configuration.serverUrl, plasmoid.configuration.username,
                     plasmoid.configuration.appPassword, resource.href, resource.etag,
                     function (err2) {
                         if (err2) {
-                            console.warn("CalDAV Agenda: failed to delete event:", err2);
+                            root.logWarn("Failed to delete event: " + err2);
                             formError = errorSummary(err2);
                         } else {
                             root.itemActionToken++;
@@ -1078,7 +1078,7 @@ PlasmoidItem {
             plasmoid.configuration.appPassword, calendarHref, uid, icsText,
             function (err) {
                 if (err) {
-                    console.warn("CalDAV Agenda: failed to create task:", err);
+                    root.logWarn("Failed to create task: " + err);
                     formError = errorSummary(err);
                 } else {
                     root.itemActionToken++;
@@ -1095,7 +1095,7 @@ PlasmoidItem {
             plasmoid.configuration.appPassword, calendarHref, uid, icsText,
             function (err) {
                 if (err) {
-                    console.warn("CalDAV Agenda: failed to create event:", err);
+                    root.logWarn("Failed to create event: " + err);
                     formError = errorSummary(err);
                 } else {
                     root.itemActionToken++;
@@ -1154,8 +1154,24 @@ PlasmoidItem {
         // days of September alongside the first of October) - fetching by
         // week, not always by month, keeps every visible day's events
         // requested regardless of which side of that boundary it falls on.
-        var rangeStart = isWeekViewMode() ? DateUtils.startOfWeek(monthDate) : DateUtils.startOfMonth(monthDate);
-        var rangeEnd = isWeekViewMode() ? DateUtils.addDays(rangeStart, 7) : DateUtils.addMonths(rangeStart, 1);
+        var rangeStart, rangeEnd;
+        if (isWeekViewMode()) {
+            rangeStart = DateUtils.startOfWeek(monthDate);
+            rangeEnd = DateUtils.addDays(rangeStart, 7);
+        } else {
+            // The Month grid itself (see MonthView.qml's buildWeeks) pads
+            // its first/last row out to a full Sunday-Saturday week, so it
+            // can show a few days from the previous/next month too (e.g.
+            // 1 October at the end of September's grid) - fetching only
+            // the exact calendar month left those padding days' events
+            // never requested at all, so a new event added to one of them
+            // silently didn't show up. Fetch the whole visible grid
+            // instead, matching buildWeeks' own start/end exactly.
+            var monthStart = DateUtils.startOfMonth(monthDate);
+            var lastDayOfMonth = DateUtils.addDays(DateUtils.addMonths(monthStart, 1), -1);
+            rangeStart = DateUtils.startOfWeek(monthStart);
+            rangeEnd = DateUtils.addDays(DateUtils.startOfWeek(lastDayOfMonth), 7);
+        }
 
         var pending = calendars.length;
         var collected = [];
@@ -1192,7 +1208,7 @@ PlasmoidItem {
                                     collected.push(e);
                                 });
                             } catch (parseErr) {
-                                console.warn("CalDAV Agenda: skipping malformed event (month view) in", cal.name, ":", parseErr);
+                                root.logWarn("Skipping malformed event (month view) in " + cal.name + ": " + parseErr);
                             }
                         });
                     } finally {
@@ -1200,7 +1216,7 @@ PlasmoidItem {
                     }
                 });
             } catch (initErr) {
-                console.warn("CalDAV Agenda: failed to start month events request for", cal.name, ":", initErr);
+                root.logWarn("Failed to start month events request for " + cal.name + ": " + initErr);
                 firstError = firstError || "network";
                 checkDone();
             }
@@ -1216,7 +1232,36 @@ PlasmoidItem {
         case "notfound": return i18n("Server address not found");
         case "parse": return i18n("Couldn't read calendar data");
         case "timeout": return i18n("Timed out waiting for the server");
-        default: return i18n("Something went wrong");
         }
+        // describeHttpError in caldav.js falls back to "http:<status>" for
+        // any status this widget doesn't otherwise recognize (401/403/404/
+        // 0 are the specific codes above) - surface the actual status
+        // rather than a blank "something went wrong", and call out the one
+        // most likely to actually happen here: editing/deleting an item
+        // sends an If-Match on the etag it just fetched, and 412/409 means
+        // the server refused because that item changed since - a genuine
+        // conflict, not a bug in this widget.
+        var httpMatch = /^http:(\d+)$/.exec(code || "");
+        if (httpMatch) {
+            var status = httpMatch[1];
+            if (status === "412" || status === "409") {
+                return i18n("This item changed elsewhere - refresh and try again (error %1)", status);
+            }
+            return i18n("Server error (%1)", status);
+        }
+        return i18n("Something went wrong");
+    }
+
+    // Persists the last ~50 warnings (newest first, on top of the usual
+    // console.warn) to a hidden config entry - see ConfigDiagnostics.qml -
+    // so an occasional CalDAV failure (editing an event, a malformed feed,
+    // ...) is still visible afterwards from Settings, not just from a
+    // terminal/journal this widget doesn't otherwise expose.
+    function logWarn(message) {
+        console.warn(message);
+        var entry = Qt.formatDateTime(new Date(), "yyyy-MM-dd HH:mm:ss") + "  " + message;
+        var lines = (plasmoid.configuration.diagnosticLog || "").split("\n").filter(function (l) { return l.length > 0; });
+        lines.unshift(entry);
+        plasmoid.configuration.diagnosticLog = lines.slice(0, 50).join("\n");
     }
 }

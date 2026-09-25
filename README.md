@@ -56,6 +56,9 @@ file or with `kpackagetool6`.
 - Desktop notifications for an event's own reminder (VALARM, e.g. set in
   Nextcloud Calendar) and for a task becoming due soon (configurable
   lead time), both toggleable in Appearance settings
+- A Diagnostics settings page listing the most recent errors (a failed
+  fetch, save, or delete), so there's something concrete to check or
+  include in a bug report instead of just "something went wrong"
 
 ## Multiple widgets: separate calendar and to-do lists
 

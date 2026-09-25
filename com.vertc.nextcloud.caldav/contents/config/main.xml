@@ -75,6 +75,16 @@
       <default>false</default>
     </entry>
   </group>
+  <group name="Diagnostics">
+    <!-- Newest-first, one line per entry, "yyyy-MM-dd HH:mm:ss  message" -
+         see main.qml's logWarn. Capped there to the most recent ~50
+         entries; exists so an occasional CalDAV failure (editing an
+         event, a malformed feed, ...) is visible from Settings without a
+         terminal/journal this widget doesn't otherwise expose. -->
+    <entry name="diagnosticLog" type="String">
+      <default></default>
+    </entry>
+  </group>
   <group name="General">
     <entry name="displayMode" type="Enum">
       <label>What to show</label>

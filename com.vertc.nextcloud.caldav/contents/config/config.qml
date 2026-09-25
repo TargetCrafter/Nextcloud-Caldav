@@ -12,4 +12,9 @@ ConfigModel {
         icon: "preferences-desktop-color"
         source: "ConfigAppearance.qml"
     }
+    ConfigCategory {
+        name: i18n("Diagnostics")
+        icon: "view-list-text"
+        source: "ConfigDiagnostics.qml"
+    }
 }
