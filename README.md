@@ -38,7 +38,12 @@ file or with `kpackagetool6`.
   that same family bar), so it isn't also duplicated in the general list
 - A popup form for adding, editing, or deleting events and tasks (single,
   non-recurring events only for editing/deleting), with title, calendar,
-  due/start date+time, description, and location fields
+  due/start date+time, description, and location fields - tasks also get
+  a Priority (None/Low/Medium/High) field, and, once created, a Status
+  one (Needs action/In progress/Completed/Cancelled) alongside the
+  checkbox's own quick complete/reopen toggle. A high-priority task shows
+  a small attention icon in the list; in progress/cancelled show a
+  one-line status underneath the title
 - Each event/task renders as its own card with a hover highlight and a
   calendar-color accent bar, so items are easy to tell apart at a glance
 - Panel view shows the next event's countdown, today's event count, or just

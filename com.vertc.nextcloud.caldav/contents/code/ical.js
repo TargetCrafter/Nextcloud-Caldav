@@ -455,27 +455,45 @@ function patchTodoStatus(todo, completed) {
            out.join("\n") + "\nEND:VTODO\nEND:VCALENDAR\n";
 }
 
-// Rewrites SUMMARY/DUE/DESCRIPTION/LOCATION on an existing task's raw
-// property lines, the same patch-in-place approach as patchTodoStatus
-// above, so STATUS, PRIORITY, RELATED-TO and anything else already on the
+// Rewrites SUMMARY/DUE/DESCRIPTION/LOCATION/PRIORITY/STATUS (and the
+// COMPLETED/PERCENT-COMPLETE pair that go with STATUS) on an existing
+// task's raw property lines, the same patch-in-place approach as
+// patchTodoStatus above, so RELATED-TO and anything else already on the
 // task survive an edit untouched instead of being dropped by rebuilding
 // the object from scratch. `fields.due` is an optional Date; passing none
 // removes it. `fields.dueHasTime` writes it as a DATE-TIME (floating local
 // time, like an event's DTSTART) instead of a bare DATE when true.
 // `fields.description`/`fields.location` are optional strings; an empty
-// string removes the property.
+// string removes the property. `fields.priority` is 0-9 (0 = none, same
+// as RFC 5545); the property is omitted rather than written as 0, same as
+// buildVTodoIcs. `fields.status` is one of NEEDS-ACTION/IN-PROCESS/
+// COMPLETED/CANCELLED - COMPLETED stamps the current time unless `todo`
+// was already COMPLETED (its own original COMPLETED timestamp is kept,
+// same as patchTodoStatus's own quick-toggle would have left it, rather
+// than bumping it to "just now" on every unrelated edit of an
+// already-done task).
 function patchTodoFields(todo, fields) {
     var lines = (todo.rawLines || []).slice();
     var out = [];
     for (var i = 0; i < lines.length; i++) {
         var prop = parseLine(lines[i]);
-        if (prop && (prop.name === "SUMMARY" || prop.name === "DUE" || prop.name === "DESCRIPTION" || prop.name === "LOCATION")) continue;
+        if (prop && (prop.name === "SUMMARY" || prop.name === "DUE" || prop.name === "DESCRIPTION" || prop.name === "LOCATION" ||
+                     prop.name === "PRIORITY" || prop.name === "STATUS" || prop.name === "COMPLETED" || prop.name === "PERCENT-COMPLETE")) continue;
         out.push(lines[i]);
     }
     out.push("SUMMARY:" + escapeText(fields.summary));
     if (fields.due) out.push(fields.dueHasTime ? ("DUE:" + formatLocalDateTimeStamp(fields.due)) : ("DUE;VALUE=DATE:" + formatDateStamp(fields.due)));
     if (fields.description) out.push("DESCRIPTION:" + escapeText(fields.description));
     if (fields.location) out.push("LOCATION:" + escapeText(fields.location));
+    if (fields.priority) out.push("PRIORITY:" + fields.priority);
+    out.push("STATUS:" + fields.status);
+    if (fields.status === "COMPLETED") {
+        var completedStamp = (todo.status === "COMPLETED" && todo.completed) ? formatDateTimeUTC(todo.completed) : formatDateTimeUTC(new Date());
+        out.push("COMPLETED:" + completedStamp);
+        out.push("PERCENT-COMPLETE:100");
+    } else {
+        out.push("PERCENT-COMPLETE:0");
+    }
     return "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//KDE-Caldav//CalDAV Agenda//EN\nBEGIN:VTODO\n" +
            out.join("\n") + "\nEND:VTODO\nEND:VCALENDAR\n";
 }
@@ -525,7 +543,10 @@ function formatLocalDateTimeStamp(date) {
 // case it's written as a DATE-TIME (floating local time, like an event's
 // DTSTART) - due dates default to no time of day, but the editor lets one
 // be added. `parentUid` is optional, for creating a subtask under an
-// existing task.
+// existing task. `opts.priority` is 0-9 (0 = none, RFC 5545's own
+// "undefined" value) - a new task is always created NEEDS-ACTION, so
+// there's no status to set here (see ItemFormPopup.qml's status combo,
+// which is edit-only for the same reason).
 function buildVTodoIcs(opts) {
     var lines = [
         "BEGIN:VCALENDAR",
@@ -541,6 +562,7 @@ function buildVTodoIcs(opts) {
     if (opts.due) lines.push(opts.dueHasTime ? ("DUE:" + formatLocalDateTimeStamp(opts.due)) : ("DUE;VALUE=DATE:" + formatDateStamp(opts.due)));
     if (opts.description) lines.push("DESCRIPTION:" + escapeText(opts.description));
     if (opts.location) lines.push("LOCATION:" + escapeText(opts.location));
+    if (opts.priority) lines.push("PRIORITY:" + opts.priority);
     if (opts.parentUid) lines.push("RELATED-TO:" + opts.parentUid);
     lines.push("END:VTODO", "END:VCALENDAR", "");
     return lines.join("\n");

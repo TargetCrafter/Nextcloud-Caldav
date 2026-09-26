@@ -64,9 +64,9 @@ QQC2.Popup {
     property var activeDateField: null
     property var activeTimeField: null
 
-    signal createTask(string calendarHref, string summary, var due, bool dueHasTime, string description, string location, string parentUid)
+    signal createTask(string calendarHref, string summary, var due, bool dueHasTime, string description, string location, string parentUid, int priority)
     signal createEvent(string calendarHref, string summary, var start, var end, bool allDay, string description, string location)
-    signal saveTask(var task, string summary, var due, bool dueHasTime, string description, string location)
+    signal saveTask(var task, string summary, var due, bool dueHasTime, string description, string location, int priority, string status)
     signal saveEvent(var event, string summary, var start, var end, bool allDay, string description, string location)
     signal removeItem(var item, bool isTask)
 
@@ -115,6 +115,7 @@ QQC2.Popup {
         durationSpin.value = 1;
         descriptionField.text = "";
         locationField.text = "";
+        priorityCombo.currentIndex = 0;
         popup.open();
     }
 
@@ -132,6 +133,8 @@ QQC2.Popup {
         if (taskFlag) {
             dueField.text = item.due ? popup.formatDateField(item.due) : "";
             dueTimeField.text = (item.due && !item.dueAllDay) ? popup.formatTimeField(item.due) : "";
+            priorityCombo.currentIndex = popup.priorityToIndex(item.priority || 0);
+            statusCombo.currentIndex = popup.statusToIndex(item.status || "NEEDS-ACTION");
         } else {
             allDayCheck.checked = !!item.allDay;
             startDateField.text = item.dtstart ? popup.formatDateField(item.dtstart) : "";
@@ -262,6 +265,42 @@ QQC2.Popup {
                 }
                 QQC2.ToolTip.text: i18n("Pick a time")
                 QQC2.ToolTip.visible: hovered
+            }
+        }
+
+        // Priority and Status are split into their own rows, rather than
+        // sharing one - this popup's fixed width has overflowed before
+        // (see the event date/time rows' own history) when a row's
+        // controls plus their labels didn't fit, and Status's own item
+        // text ("Needs action", "In progress", ...) run long enough,
+        // especially translated, to risk exactly that here too.
+        RowLayout {
+            Layout.fillWidth: true
+            visible: popup.isTask
+            spacing: Kirigami.Units.smallSpacing
+
+            QQC2.Label { text: i18n("Priority:") }
+            QQC2.ComboBox {
+                id: priorityCombo
+                Layout.fillWidth: true
+                model: [i18n("None"), i18n("Low"), i18n("Medium"), i18n("High")]
+            }
+        }
+
+        // Status is only offered once a task actually exists - a new task
+        // is always created NEEDS-ACTION (creating one that's already
+        // done/cancelled isn't a normal case worth a control for),
+        // matching how the completed-toggle checkbox has always worked.
+        RowLayout {
+            Layout.fillWidth: true
+            visible: popup.isTask && popup.editMode
+            spacing: Kirigami.Units.smallSpacing
+
+            QQC2.Label { text: i18n("Status:") }
+            QQC2.ComboBox {
+                id: statusCombo
+                Layout.fillWidth: true
+                model: [i18n("Needs action"), i18n("In progress"), i18n("Completed"), i18n("Cancelled")]
             }
         }
 
@@ -435,6 +474,38 @@ QQC2.Popup {
         return { hours: h, minutes: mnt };
     }
 
+    // RFC 5545 priority is 1 (highest) to 9 (lowest), 0 = undefined - the
+    // same High(1-4)/Medium(5)/Low(6-9)/None(0) bucketing most calendar
+    // apps (Thunderbird, Outlook, Nextcloud's own web UI) show instead of
+    // the raw 9-level scale, and the same boundaries TaskRow.qml's own
+    // priority icon already uses (1-4). Saving always writes each
+    // bucket's own canonical value (9/5/1), even when the task's actual
+    // priority was some other value in that bucket (e.g. 3) - expected,
+    // matching how those other apps' equally-simple pickers behave too.
+    function priorityToIndex(p) {
+        if (p >= 1 && p <= 4) return 3; // High
+        if (p === 5) return 2; // Medium
+        if (p >= 6 && p <= 9) return 1; // Low
+        return 0; // None
+    }
+
+    function indexToPriority(idx) {
+        return [0, 9, 5, 1][idx] || 0;
+    }
+
+    function statusToIndex(status) {
+        switch (status) {
+        case "IN-PROCESS": return 1;
+        case "COMPLETED": return 2;
+        case "CANCELLED": return 3;
+        default: return 0; // NEEDS-ACTION
+        }
+    }
+
+    function indexToStatus(idx) {
+        return ["NEEDS-ACTION", "IN-PROCESS", "COMPLETED", "CANCELLED"][idx] || "NEEDS-ACTION";
+    }
+
     function submit() {
         localError = "";
         var summary = titleField.text.trim();
@@ -463,11 +534,13 @@ QQC2.Popup {
                     dueHasTime = true;
                 }
             }
+            var priority = popup.indexToPriority(priorityCombo.currentIndex);
             if (popup.editMode) {
-                popup.saveTask(popup.editingItem, summary, due, dueHasTime, description, location);
+                var status = popup.indexToStatus(statusCombo.currentIndex);
+                popup.saveTask(popup.editingItem, summary, due, dueHasTime, description, location, priority, status);
             } else {
                 var calendarHref = popup.parentTask ? popup.parentTask.calendarHref : cal.href;
-                popup.createTask(calendarHref, summary, due, dueHasTime, description, location, popup.parentTask ? popup.parentTask.uid : "");
+                popup.createTask(calendarHref, summary, due, dueHasTime, description, location, popup.parentTask ? popup.parentTask.uid : "", priority);
             }
         } else {
             var startDateText = startDateField.text.trim();
