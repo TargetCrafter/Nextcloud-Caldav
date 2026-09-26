@@ -21,6 +21,8 @@ Item {
     signal toggleCollapseRequested()
 
     readonly property bool completed: taskData.status === "COMPLETED"
+    readonly property bool cancelled: taskData.status === "CANCELLED"
+    readonly property bool inProgress: taskData.status === "IN-PROCESS"
     // Defaults to taskData's own stamped depth (see main.qml's
     // orderTasksWithHierarchy), but can be overridden explicitly instead -
     // see TaskFamilyCard.qml's "Recently completed" row wiring, which
@@ -91,13 +93,25 @@ Item {
                 // separate calendar-name line was redundant.
                 Layout.fillWidth: true
                 elide: Text.ElideRight
-                font.strikeout: delegate.completed
+                font.strikeout: delegate.completed || delegate.cancelled
                 font.pointSize: delegate.depth > 0 ? Kirigami.Theme.smallFont.pointSize : Kirigami.Theme.defaultFont.pointSize
-                opacity: delegate.completed ? 0.6 : 1
+                opacity: (delegate.completed || delegate.cancelled) ? 0.6 : 1
                 // See EventDelegate.qml's summary Label for why this must be
                 // plain text: this renders a server-supplied task summary.
                 textFormat: Text.PlainText
                 text: delegate.taskData.summary || i18n("(No title)")
+            }
+
+            // Cancelled/in-progress and completed-with-date are mutually
+            // exclusive (a task only ever has one status), so only one of
+            // these two ever shows at once.
+            PlasmaComponents3.Label {
+                Layout.fillWidth: true
+                visible: delegate.inProgress || delegate.cancelled
+                elide: Text.ElideRight
+                opacity: 0.6
+                font.pointSize: Kirigami.Theme.smallFont.pointSize
+                text: delegate.inProgress ? i18n("In progress") : i18n("Cancelled")
             }
 
             PlasmaComponents3.Label {
