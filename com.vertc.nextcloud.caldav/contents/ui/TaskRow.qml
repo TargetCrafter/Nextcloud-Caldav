@@ -111,7 +111,7 @@ Item {
                 elide: Text.ElideRight
                 opacity: 0.6
                 font.pointSize: Kirigami.Theme.smallFont.pointSize
-                text: delegate.inProgress ? i18n("In progress") : i18n("Cancelled")
+                text: delegate.inProgress ? i18n("In progress (%1%)", delegate.taskData.percentComplete || 0) : i18n("Cancelled")
             }
 
             PlasmaComponents3.Label {

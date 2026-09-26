@@ -66,7 +66,7 @@ QQC2.Popup {
 
     signal createTask(string calendarHref, string summary, var due, bool dueHasTime, string description, string location, string parentUid, int priority)
     signal createEvent(string calendarHref, string summary, var start, var end, bool allDay, string description, string location)
-    signal saveTask(var task, string summary, var due, bool dueHasTime, string description, string location, int priority, string status)
+    signal saveTask(var task, string summary, var due, bool dueHasTime, string description, string location, int priority, string status, int percentComplete)
     signal saveEvent(var event, string summary, var start, var end, bool allDay, string description, string location)
     signal removeItem(var item, bool isTask)
 
@@ -135,6 +135,7 @@ QQC2.Popup {
             dueTimeField.text = (item.due && !item.dueAllDay) ? popup.formatTimeField(item.due) : "";
             priorityCombo.currentIndex = popup.priorityToIndex(item.priority || 0);
             statusCombo.currentIndex = popup.statusToIndex(item.status || "NEEDS-ACTION");
+            percentSpin.value = item.percentComplete || 0;
         } else {
             allDayCheck.checked = !!item.allDay;
             startDateField.text = item.dtstart ? popup.formatDateField(item.dtstart) : "";
@@ -301,6 +302,27 @@ QQC2.Popup {
                 id: statusCombo
                 Layout.fillWidth: true
                 model: [i18n("Needs action"), i18n("In progress"), i18n("Completed"), i18n("Cancelled")]
+            }
+        }
+
+        // Only meaningful (and only offered) while "In progress" is
+        // selected above - Needs action/Cancelled are always 0% and
+        // Completed is always 100%, same as before this field existed at
+        // all (see submit()'s own status->percent mapping).
+        RowLayout {
+            Layout.fillWidth: true
+            visible: popup.isTask && popup.editMode && statusCombo.currentIndex === 1
+            spacing: Kirigami.Units.smallSpacing
+
+            QQC2.Label { text: i18n("% complete:") }
+            QQC2.SpinBox {
+                id: percentSpin
+                Layout.fillWidth: true
+                from: 0
+                to: 100
+                stepSize: 5
+                textFromValue: (value) => i18n("%1%", value)
+                valueFromText: (text) => parseInt(text, 10) || 0
             }
         }
 
@@ -537,7 +559,11 @@ QQC2.Popup {
             var priority = popup.indexToPriority(priorityCombo.currentIndex);
             if (popup.editMode) {
                 var status = popup.indexToStatus(statusCombo.currentIndex);
-                popup.saveTask(popup.editingItem, summary, due, dueHasTime, description, location, priority, status);
+                // Needs action/Cancelled are always 0%, Completed always
+                // 100% - only In progress has a percentage actually worth
+                // asking about (see percentSpin's own visibility above).
+                var percentComplete = status === "COMPLETED" ? 100 : (status === "IN-PROCESS" ? percentSpin.value : 0);
+                popup.saveTask(popup.editingItem, summary, due, dueHasTime, description, location, priority, status, percentComplete);
             } else {
                 var calendarHref = popup.parentTask ? popup.parentTask.calendarHref : cal.href;
                 popup.createTask(calendarHref, summary, due, dueHasTime, description, location, popup.parentTask ? popup.parentTask.uid : "", priority);

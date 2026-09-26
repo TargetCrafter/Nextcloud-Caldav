@@ -82,7 +82,7 @@ Item {
     signal openConfigureRequested()
     signal createTaskRequested(string calendarHref, string summary, var due, bool dueHasTime, string description, string location, string parentUid, int priority)
     signal createEventRequested(string calendarHref, string summary, var start, var end, bool allDay, string description, string location)
-    signal editTaskRequested(var task, string summary, var due, bool dueHasTime, string description, string location, int priority, string status)
+    signal editTaskRequested(var task, string summary, var due, bool dueHasTime, string description, string location, int priority, string status, int percentComplete)
     signal editEventRequested(var event, string summary, var start, var end, bool allDay, string description, string location)
     signal deleteTaskRequested(var task)
     signal deleteEventRequested(var event)
@@ -422,7 +422,7 @@ Item {
         externalError: fullRep.formError
         onCreateTask: fullRep.createTaskRequested(calendarHref, summary, due, dueHasTime, description, location, parentUid, priority)
         onCreateEvent: fullRep.createEventRequested(calendarHref, summary, start, end, allDay, description, location)
-        onSaveTask: fullRep.editTaskRequested(task, summary, due, dueHasTime, description, location, priority, status)
+        onSaveTask: fullRep.editTaskRequested(task, summary, due, dueHasTime, description, location, priority, status, percentComplete)
         onSaveEvent: fullRep.editEventRequested(event, summary, start, end, allDay, description, location)
         onRemoveItem: {
             if (isTask) fullRep.deleteTaskRequested(item);
