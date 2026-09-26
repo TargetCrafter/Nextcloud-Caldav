@@ -136,7 +136,7 @@ PlasmoidItem {
         onOpenConfigureRequested: plasmoid.internalAction("configure").trigger()
         onCreateTaskRequested: root.createTask(calendarHref, summary, due, dueHasTime, description, location, parentUid, priority)
         onCreateEventRequested: root.createEvent(calendarHref, summary, start, end, allDay, description, location)
-        onEditTaskRequested: root.updateTask(task, summary, due, dueHasTime, description, location, priority, status)
+        onEditTaskRequested: root.updateTask(task, summary, due, dueHasTime, description, location, priority, status, percentComplete)
         onEditEventRequested: root.updateEvent(event, summary, start, end, allDay, description, location)
         onDeleteTaskRequested: root.deleteTask(task)
         onDeleteEventRequested: root.deleteEvent(event)
@@ -250,7 +250,7 @@ PlasmoidItem {
     }
 
     Component.onCompleted: {
-        console.log("Nextcloud Caldav: build 0.5.42 starting");
+        console.log("Nextcloud Caldav: build 0.5.43 starting");
         refresh();
         if (isCalendarViewMode()) {
             // monthCursor's own property default (see its declaration
@@ -994,9 +994,9 @@ PlasmoidItem {
             });
     }
 
-    function updateTask(task, summary, due, dueHasTime, description, location, priority, status) {
+    function updateTask(task, summary, due, dueHasTime, description, location, priority, status, percentComplete) {
         formError = "";
-        var icsText = ICAL.patchTodoFields(task, { summary: summary, due: due || null, dueHasTime: !!dueHasTime, description: description, location: location, priority: priority || 0, status: status || "NEEDS-ACTION" });
+        var icsText = ICAL.patchTodoFields(task, { summary: summary, due: due || null, dueHasTime: !!dueHasTime, description: description, location: location, priority: priority || 0, status: status || "NEEDS-ACTION", percentComplete: percentComplete || 0 });
         CalDAV.updateResource(plasmoid.configuration.serverUrl, plasmoid.configuration.username,
             plasmoid.configuration.appPassword, task.href, task.etag, icsText,
             function (err) {

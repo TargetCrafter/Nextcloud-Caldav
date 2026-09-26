@@ -41,9 +41,10 @@ file or with `kpackagetool6`.
   due/start date+time, description, and location fields - tasks also get
   a Priority (None/Low/Medium/High) field, and, once created, a Status
   one (Needs action/In progress/Completed/Cancelled) alongside the
-  checkbox's own quick complete/reopen toggle. A high-priority task shows
-  a small attention icon in the list; in progress/cancelled show a
-  one-line status underneath the title
+  checkbox's own quick complete/reopen toggle, with a % complete field of
+  its own once a task is set to In progress. A high-priority task shows a
+  small attention icon in the list; in progress (with its percentage)/
+  cancelled show a one-line status underneath the title
 - Each event/task renders as its own card with a hover highlight and a
   calendar-color accent bar, so items are easy to tell apart at a glance
 - Panel view shows the next event's countdown, today's event count, or just

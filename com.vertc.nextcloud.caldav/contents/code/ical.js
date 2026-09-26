@@ -471,7 +471,10 @@ function patchTodoStatus(todo, completed) {
 // was already COMPLETED (its own original COMPLETED timestamp is kept,
 // same as patchTodoStatus's own quick-toggle would have left it, rather
 // than bumping it to "just now" on every unrelated edit of an
-// already-done task).
+// already-done task). `fields.percentComplete` (0-100) is written as-is -
+// the caller (ItemFormPopup.qml's status/percent field) is the one that
+// keeps it in step with status (0 for Needs action/Cancelled, 100 for
+// Completed, user-chosen only for In progress), not this function.
 function patchTodoFields(todo, fields) {
     var lines = (todo.rawLines || []).slice();
     var out = [];
@@ -490,10 +493,8 @@ function patchTodoFields(todo, fields) {
     if (fields.status === "COMPLETED") {
         var completedStamp = (todo.status === "COMPLETED" && todo.completed) ? formatDateTimeUTC(todo.completed) : formatDateTimeUTC(new Date());
         out.push("COMPLETED:" + completedStamp);
-        out.push("PERCENT-COMPLETE:100");
-    } else {
-        out.push("PERCENT-COMPLETE:0");
     }
+    out.push("PERCENT-COMPLETE:" + (fields.percentComplete || 0));
     return "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//KDE-Caldav//CalDAV Agenda//EN\nBEGIN:VTODO\n" +
            out.join("\n") + "\nEND:VTODO\nEND:VCALENDAR\n";
 }
