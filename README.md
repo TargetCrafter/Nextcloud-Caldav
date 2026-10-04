@@ -199,11 +199,17 @@ To remove it: `kpackagetool6 --type Plasma/Applet --remove com.vertc.nextcloud.c
   work against any SabreDAV-based server (Nextcloud, ownCloud) but not
   against CalDAV servers that aren't SabreDAV-based.
 - **Timezones**: event times are expanded server-side and returned in UTC
-  by the `?export` endpoint, so this mostly isn't an issue for events. A
-  task (VTODO) due date carrying a `TZID` (rather than UTC) is still
-  treated as wall-clock time in the desktop's local timezone, since
-  there's no bundled IANA timezone database — a task due date authored in
-  a different timezone than your desktop may show a shifted time.
+  by the `?export` endpoint, so this mostly isn't an issue for events. Any
+  event or task due date/time created or edited through this widget is
+  always written as a proper UTC instant too (converted from the desktop's
+  own local time), not a floating (no `TZID`, no "Z") value - floating
+  values were seen coming back from SabreDAV's own export with a
+  different offset applied than the desktop's actual one, shifting the
+  displayed time by a fixed amount (e.g. 2 hours) on every round-trip. An
+  event/task authored elsewhere with an explicit `TZID` (rather than UTC)
+  is still treated as wall-clock time in the desktop's local timezone,
+  since there's no bundled IANA timezone database - one authored in a
+  different timezone than your desktop may show a shifted time.
 - **Credential storage**: the app password (whether obtained via browser
   sign-in or entered manually) is stored via KConfigXT's `Password` entry
   type, which KDE Frameworks backs with KWallet when one is available on

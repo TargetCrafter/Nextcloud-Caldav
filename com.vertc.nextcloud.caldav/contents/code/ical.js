@@ -11,6 +11,17 @@
 // TZIDs against). For most single-timezone home setups this matches the
 // Nextcloud server's timezone; it will be off for shared calendars whose
 // events were created in a different timezone than the desktop's.
+//
+// Anything this app itself writes (a new or edited event/task's own
+// DTSTART/DTEND/DUE) is always sent as a proper UTC instant - converted
+// from whatever the device's own local timezone says the picked date/time
+// means - rather than as a floating (no TZID, no "Z") value. A floating
+// value has no defined offset at all, and was seen round-tripping through
+// SabreDAV's own calendar-query export with a different offset applied
+// than the device's actual one, shifting the displayed time by a fixed
+// amount (e.g. 2 hours) every time. Writing an unambiguous UTC instant
+// instead removes that gap entirely, regardless of what the server would
+// otherwise have assumed for a floating value.
 
 function unfold(text) {
     // RFC 5545 line folding: a CRLF followed by a space/tab continues the
@@ -461,8 +472,10 @@ function patchTodoStatus(todo, completed) {
 // patchTodoStatus above, so RELATED-TO and anything else already on the
 // task survive an edit untouched instead of being dropped by rebuilding
 // the object from scratch. `fields.due` is an optional Date; passing none
-// removes it. `fields.dueHasTime` writes it as a DATE-TIME (floating local
-// time, like an event's DTSTART) instead of a bare DATE when true.
+// removes it. `fields.dueHasTime` writes it as a DATE-TIME (a UTC instant -
+// see the file-level comment on why not floating local time - converted
+// from whatever `fields.due`'s own local getters say) instead of a bare
+// DATE when true.
 // `fields.description`/`fields.location` are optional strings; an empty
 // string removes the property. `fields.priority` is 0-9 (0 = none, same
 // as RFC 5545); the property is omitted rather than written as 0, same as
@@ -485,7 +498,7 @@ function patchTodoFields(todo, fields) {
         out.push(lines[i]);
     }
     out.push("SUMMARY:" + escapeText(fields.summary));
-    if (fields.due) out.push(fields.dueHasTime ? ("DUE:" + formatLocalDateTimeStamp(fields.due)) : ("DUE;VALUE=DATE:" + formatDateStamp(fields.due)));
+    if (fields.due) out.push(fields.dueHasTime ? ("DUE:" + formatDateTimeUTC(fields.due)) : ("DUE;VALUE=DATE:" + formatDateStamp(fields.due)));
     if (fields.description) out.push("DESCRIPTION:" + escapeText(fields.description));
     if (fields.location) out.push("LOCATION:" + escapeText(fields.location));
     if (fields.priority) out.push("PRIORITY:" + fields.priority);
@@ -521,8 +534,8 @@ function patchEventFields(icsText, fields) {
         out.push("DTSTART;VALUE=DATE:" + formatDateStamp(fields.start));
         out.push("DTEND;VALUE=DATE:" + formatDateStamp(fields.end));
     } else {
-        out.push("DTSTART:" + formatLocalDateTimeStamp(fields.start));
-        out.push("DTEND:" + formatLocalDateTimeStamp(fields.end));
+        out.push("DTSTART:" + formatDateTimeUTC(fields.start));
+        out.push("DTEND:" + formatDateTimeUTC(fields.end));
     }
     if (fields.description) out.push("DESCRIPTION:" + escapeText(fields.description));
     if (fields.location) out.push("LOCATION:" + escapeText(fields.location));
@@ -534,16 +547,11 @@ function formatDateStamp(date) {
     return date.getFullYear() + pad(date.getMonth() + 1) + pad(date.getDate());
 }
 
-function formatLocalDateTimeStamp(date) {
-    return date.getFullYear() + pad(date.getMonth() + 1) + pad(date.getDate()) + "T" +
-           pad(date.getHours()) + pad(date.getMinutes()) + pad(date.getSeconds());
-}
-
 // Builds a brand-new VTODO's ICS text for creation. `due` is an optional
 // Date, written as a bare DATE unless `opts.dueHasTime` is set, in which
-// case it's written as a DATE-TIME (floating local time, like an event's
-// DTSTART) - due dates default to no time of day, but the editor lets one
-// be added. `parentUid` is optional, for creating a subtask under an
+// case it's written as a DATE-TIME (a UTC instant - see the file-level
+// comment on why not floating local time) - due dates default to no time
+// of day, but the editor lets one be added. `parentUid` is optional, for creating a subtask under an
 // existing task. `opts.priority` is 0-9 (0 = none, RFC 5545's own
 // "undefined" value) - a new task is always created NEEDS-ACTION, so
 // there's no status to set here (see ItemFormPopup.qml's status combo,
@@ -560,7 +568,7 @@ function buildVTodoIcs(opts) {
         "STATUS:NEEDS-ACTION",
         "PERCENT-COMPLETE:0"
     ];
-    if (opts.due) lines.push(opts.dueHasTime ? ("DUE:" + formatLocalDateTimeStamp(opts.due)) : ("DUE;VALUE=DATE:" + formatDateStamp(opts.due)));
+    if (opts.due) lines.push(opts.dueHasTime ? ("DUE:" + formatDateTimeUTC(opts.due)) : ("DUE;VALUE=DATE:" + formatDateStamp(opts.due)));
     if (opts.description) lines.push("DESCRIPTION:" + escapeText(opts.description));
     if (opts.location) lines.push("LOCATION:" + escapeText(opts.location));
     if (opts.priority) lines.push("PRIORITY:" + opts.priority);
@@ -572,8 +580,9 @@ function buildVTodoIcs(opts) {
 // Builds a brand-new VEVENT's ICS text for creation. `start`/`end` are
 // Dates; when `allDay` is true they're written as DATE values (end is
 // exclusive per RFC 5545, so callers should pass the day *after* the last
-// all-day date), otherwise as floating (no TZID/UTC) DATE-TIME values in
-// the desktop's local wall-clock time.
+// all-day date), otherwise as DATE-TIME values holding a proper UTC
+// instant (see the file-level comment on why not floating local time),
+// converted from whatever the desktop's own local wall-clock getters say.
 function buildVEventIcs(opts) {
     var lines = [
         "BEGIN:VCALENDAR",
@@ -588,8 +597,8 @@ function buildVEventIcs(opts) {
         lines.push("DTSTART;VALUE=DATE:" + formatDateStamp(opts.start));
         lines.push("DTEND;VALUE=DATE:" + formatDateStamp(opts.end));
     } else {
-        lines.push("DTSTART:" + formatLocalDateTimeStamp(opts.start));
-        lines.push("DTEND:" + formatLocalDateTimeStamp(opts.end));
+        lines.push("DTSTART:" + formatDateTimeUTC(opts.start));
+        lines.push("DTEND:" + formatDateTimeUTC(opts.end));
     }
     if (opts.description) lines.push("DESCRIPTION:" + escapeText(opts.description));
     if (opts.location) lines.push("LOCATION:" + escapeText(opts.location));
